@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.mypy_cache/
+
+# Virtual environments
+.venv/
+
+# IDE & editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude & AI
+CLAUDE.md
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Research artifacts (raw data, not results)
+research/benchmarks/_test_data*/
+research/benchmarks/*.parquet
