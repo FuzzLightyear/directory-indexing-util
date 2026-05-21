@@ -86,6 +86,7 @@ dirindex index /path/to/directory -i jpg,png,heic -a sha512 -o /output/dir
 | `-f`, `--format` | No | Output format: `parquet` (default), `csv`, `json`, `ndjson`. Inferred from extension when `-o` is a file. |
 | `-i`, `--include` *(index only)* | No | Comma-separated extension whitelist, identical semantics to `scan`. |
 | `-a`, `--algorithm` | No | One of `sha256` (default), `sha512`, `blake2b`, `md5`. Per the project benchmarks, SHA-256 via `hashlib.file_digest` hits ~2.4 GB/s on a `ThreadPoolExecutor.map` pool of `min(cpu_count * 2, 32)` workers — fast enough that BLAKE3 (extra dep) is not warranted. |
+| `-w`, `--workers` | No | Worker thread count for hashing. Auto-tunes to `min(cpu_count * 2, 32)` when omitted. Lower it under CPU quotas, when running multiple instances concurrently, or on hardware where the default saturates disk I/O. |
 
 ### Hash Output Format
 
@@ -165,8 +166,8 @@ The package ships inline type hints with a [PEP 561](https://peps.python.org/pep
 | Symbol | Kind | Purpose |
 |---|---|---|
 | `scan_directory(root, *, include=None)` | function | Recursively enumerate files into a DataFrame |
-| `hash_dataframe(df, *, algorithm, desc=None)` | function | Hash files referenced by a DataFrame's `file_path` column |
-| `index_directory(root, *, algorithm, include=None, desc=None)` | function | Scan + hash in one call |
+| `hash_dataframe(df, *, algorithm, workers=None, desc=None)` | function | Hash files referenced by a DataFrame's `file_path` column |
+| `index_directory(root, *, algorithm, include=None, workers=None, desc=None)` | function | Scan + hash in one call |
 | `ALGORITHMS` | tuple[str, ...] | Tuple of supported hash algorithm names |
 | `DEFAULT_ALGORITHM` | str | Default algorithm (`"sha256"`) |
 | `__version__` | str | Installed package version |
@@ -217,3 +218,15 @@ pyproject.toml          Project metadata and dependency specification
 ## Research
 
 The `research/` directory contains reproducible benchmarks and analysis comparing parallelism strategies, hash algorithms, chunk sizes, and directory scanning methods. Findings informed every design decision in the implementation. See [`research/README.md`](research/README.md) for details.
+
+## Development
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full developer guide. The short version:
+
+```bash
+uv sync --extra dev
+uv run pre-commit install
+uv run pytest
+```
+
+Security policy: [`SECURITY.md`](SECURITY.md). Release notes: [`CHANGELOG.md`](CHANGELOG.md). License: MIT, see [`LICENSE`](LICENSE).
