@@ -173,6 +173,18 @@ The package ships inline type hints with a [PEP 561](https://peps.python.org/pep
 
 Anything not in this list (internal modules, CLI helpers, the `progress` utilities) is an implementation detail and may change without notice.
 
+## Platform Support
+
+Tested on Windows 11 and Linux. The implementation uses only cross-platform stdlib APIs (`os.scandir`, `hashlib.file_digest`, `concurrent.futures`) plus Polars, Rich, and Loguru — all of which support both platforms natively.
+
+Notable cross-platform considerations the package already handles:
+
+- **Path separators** — `os.sep` is used for prefix construction; both Windows backslash and POSIX forward slash work transparently.
+- **Filesystem roots** — POSIX `/` and Windows drive roots (`C:\`) are valid scan inputs.
+- **Symlinks and Windows junctions** — both are skipped before traversal; the resolved-path containment check is the second-line defense against junction escapes.
+- **Case sensitivity** — `Path.resolve()` canonicalizes to filesystem case, so the within-root containment check works consistently on case-insensitive (Windows) and case-sensitive (Linux) filesystems.
+- **Unicode in paths** — manifest JSON is written as UTF-8 with LF line endings on every platform, so non-ASCII filenames round-trip safely and the file is byte-identical regardless of the producing OS.
+
 ## Infrastructure
 
 | Tool | Purpose |
