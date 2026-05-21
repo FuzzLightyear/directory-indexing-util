@@ -116,10 +116,9 @@ def _cmd_scan(args: argparse.Namespace) -> None:
             fmt = suffix
 
     include = _parse_extensions(args.include)
-    exclude = _parse_extensions(args.exclude)
 
     with console.status("[bold cyan]Scanning…") as status:
-        df = scan_directory(root, include=include, exclude=exclude)
+        df = scan_directory(root, include=include)
         status.update(f"[bold cyan]Scanned {df.height:,} files")
 
     output_path = _resolve_output_path(args.output, fmt)
@@ -162,16 +161,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "-i", "--include",
         help=(
             "Comma-separated whitelist of file extensions to keep "
-            "(e.g., 'jpg,png,gif').  Leading dots and case are normalized.  "
-            "Combinable with --exclude."
-        ),
-    )
-    scan.add_argument(
-        "-x", "--exclude",
-        help=(
-            "Comma-separated blacklist of file extensions to drop "
-            "(e.g., 'tmp,log,cache').  Leading dots and case are normalized.  "
-            "Combinable with --include."
+            "(e.g., 'jpg,png,gif').  Leading dots and case are normalized."
         ),
     )
     scan.set_defaults(func=_cmd_scan)
