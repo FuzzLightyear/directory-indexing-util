@@ -168,7 +168,7 @@ def _write_manifest(
         "file_count": file_count,
         "created_at": datetime.now(UTC).isoformat(),
     }
-    path.write_text(json.dumps(payload, indent=2))
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8", newline="")
 
 
 def _cmd_scan(args: argparse.Namespace) -> None:
