@@ -12,7 +12,12 @@ from pathlib import Path
 import polars as pl
 
 
-def scan_directory(root: Path) -> pl.DataFrame:
+def scan_directory(
+    root: Path,
+    *,
+    include: set[str] | None = None,
+    exclude: set[str] | None = None,
+) -> pl.DataFrame:
     """Recursively enumerate regular files under *root*.
 
     Uses an iterative stack-based ``os.scandir`` traversal — the fastest
@@ -24,6 +29,16 @@ def scan_directory(root: Path) -> pl.DataFrame:
     ----------
     root : Path
         Directory to scan.  Must exist and be a directory.
+    include : set of str, optional
+        Whitelist of normalized lowercase extensions (without leading
+        dot) to keep.  Files whose extension is not in this set are
+        skipped.  Files with no extension match ``""``.  Combinable
+        with *exclude*.
+    exclude : set of str, optional
+        Blacklist of normalized lowercase extensions (without leading
+        dot) to drop.  Files whose extension is in this set are
+        skipped.  Files with no extension match ``""``.  Combinable
+        with *include*.
 
     Returns
     -------
@@ -48,6 +63,7 @@ def scan_directory(root: Path) -> pl.DataFrame:
     names: list[str] = []
     paths: list[str] = []
     stack: list[Path] = [root_resolved]
+    filtering = include is not None or exclude is not None
 
     while stack:
         current = stack.pop()
@@ -65,6 +81,16 @@ def scan_directory(root: Path) -> pl.DataFrame:
 
                     if not entry.is_file(follow_symlinks=False):
                         continue
+
+                    name = entry.name
+                    if filtering:
+                        dot = name.rfind(".")
+                        ext = name[dot + 1:].lower() if dot > 0 else ""
+                        if include is not None and ext not in include:
+                            continue
+                        if exclude is not None and ext in exclude:
+                            continue
+
                     try:
                         if not stat.S_ISREG(entry.stat(follow_symlinks=False).st_mode):
                             continue
@@ -73,7 +99,7 @@ def scan_directory(root: Path) -> pl.DataFrame:
 
                     resolved = str(Path(entry.path).resolve())
                     if resolved == root_str or resolved.startswith(root_prefix):
-                        names.append(entry.name)
+                        names.append(name)
                         paths.append(resolved)
         except PermissionError:
             continue
