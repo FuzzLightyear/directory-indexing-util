@@ -1,10 +1,18 @@
+<!--
+═══════════════════════════════════════════════════════════════════════
+  EXTERNAL CONTRIBUTORS: this project does not accept external PRs.
+  Please open an issue instead — see ../../issues/new/choose
+  Security vulnerabilities: see SECURITY.md (private channel).
+  The MIT license permits unlimited forking for your own modifications.
+═══════════════════════════════════════════════════════════════════════
+  Maintainer's own PRs: delete the banner above and fill in below.
+-->
+
 ## Summary
 
-<!-- One or two sentences on what this PR does and why. The diff shows the *what*; explain the *why*. -->
+<!-- One or two sentences on what this PR does and why. -->
 
 ## Changes
-
-<!-- Bulleted list of the substantive changes. -->
 
 -
 -
@@ -19,7 +27,7 @@
 - [ ] Public API changes are reflected in numpydoc docstrings and the README
 - [ ] `CHANGELOG.md` `[Unreleased]` section updated under the appropriate heading
 - [ ] No inline comments added (use docstring `Notes` for behavioural detail)
-- [ ] If the change touches paths, scanning, or hashing: behaviour verified on both Windows and Linux paths (mentally or actually)
+- [ ] If the change touches paths, scanning, or hashing: behaviour verified on both Windows and Linux paths
 
 ## Related
 
