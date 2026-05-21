@@ -25,6 +25,29 @@ _DEFAULT_FORMAT = "parquet"
 console = Console()
 
 
+def _parse_extensions(value: str | None) -> set[str] | None:
+    """Parse a comma-separated extension list into a normalized set.
+
+    Strips whitespace, drops leading dots, lowercases each entry, and
+    discards empty fragments.  Returns ``None`` when the input yields
+    no usable extensions so the scanner can short-circuit filtering.
+
+    Parameters
+    ----------
+    value : str or None
+        Raw CLI argument value (e.g., ``".JPG, png, gif"``).
+
+    Returns
+    -------
+    set of str or None
+        Normalized extension set, or ``None`` when empty.
+    """
+    if not value:
+        return None
+    exts = {part.strip().lstrip(".").lower() for part in value.split(",") if part.strip()}
+    return exts or None
+
+
 def _resolve_output_path(output: str | None, fmt: str) -> Path:
     """Determine the final output file path.
 
@@ -92,8 +115,11 @@ def _cmd_scan(args: argparse.Namespace) -> None:
         if suffix in _FORMATS and fmt == _DEFAULT_FORMAT:
             fmt = suffix
 
+    include = _parse_extensions(args.include)
+    exclude = _parse_extensions(args.exclude)
+
     with console.status("[bold cyan]Scanning…") as status:
-        df = scan_directory(root)
+        df = scan_directory(root, include=include, exclude=exclude)
         status.update(f"[bold cyan]Scanned {df.height:,} files")
 
     output_path = _resolve_output_path(args.output, fmt)
@@ -131,6 +157,22 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=_FORMATS,
         default=_DEFAULT_FORMAT,
         help=f"Output file format (default: {_DEFAULT_FORMAT}).",
+    )
+    scan.add_argument(
+        "-i", "--include",
+        help=(
+            "Comma-separated whitelist of file extensions to keep "
+            "(e.g., 'jpg,png,gif').  Leading dots and case are normalized.  "
+            "Combinable with --exclude."
+        ),
+    )
+    scan.add_argument(
+        "-x", "--exclude",
+        help=(
+            "Comma-separated blacklist of file extensions to drop "
+            "(e.g., 'tmp,log,cache').  Leading dots and case are normalized.  "
+            "Combinable with --include."
+        ),
     )
     scan.set_defaults(func=_cmd_scan)
 
