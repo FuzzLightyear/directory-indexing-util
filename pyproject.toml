@@ -6,12 +6,54 @@ build-backend = "hatchling.build"
 name = "directory-indexing-util"
 version = "0.1.0"
 description = "Performant, security-minded directory walking, file hashing, and indexing"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Mercury", email = "fuzzlightyear@protonmail.com" },
+]
+keywords = [
+    "directory",
+    "indexing",
+    "scanning",
+    "hashing",
+    "file-hash",
+    "polars",
+    "sha256",
+    "checksum",
+    "deduplication",
+    "integrity",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: System :: Filesystems",
+    "Topic :: System :: Archiving",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = [
     "polars>=1.0",
     "loguru>=0.7",
     "rich>=13.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Mercury/directory-indexing-util"
+Repository = "https://github.com/Mercury/directory-indexing-util"
+Issues = "https://github.com/Mercury/directory-indexing-util/issues"
+Changelog = "https://github.com/Mercury/directory-indexing-util/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dirindex = "directory_indexing_util.__main__:main"
