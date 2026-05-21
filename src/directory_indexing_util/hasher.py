@@ -43,7 +43,7 @@ def hash_dataframe(
     df: pl.DataFrame,
     *,
     algorithm: str = DEFAULT_ALGORITHM,
-    desc: str | None = "Hashing",
+    desc: str | None = None,
 ) -> pl.DataFrame:
     """Hash files referenced by ``df['file_path']`` and return an extended DataFrame.
 
@@ -58,9 +58,10 @@ def hash_dataframe(
         Input DataFrame.  Must contain a ``file_path`` column.
     algorithm : str, default ``"sha256"``
         Any algorithm supported by ``hashlib.file_digest``.
-    desc : str or None, default ``"Hashing"``
-        Description for the Rich progress bar.  Pass ``None`` to run
-        silently (useful for tests).
+    desc : str or None, default ``None``
+        When non-``None``, drives a Rich progress bar with the given
+        label.  Library callers leave this as ``None`` for silent
+        operation; the CLI passes a description explicitly.
 
     Returns
     -------

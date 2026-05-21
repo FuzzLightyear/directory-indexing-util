@@ -225,7 +225,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         logger.error("Input file missing required 'file_path' column.")
         raise SystemExit(1)
 
-    df = hash_dataframe(df, algorithm=args.algorithm)
+    df = hash_dataframe(df, algorithm=args.algorithm, desc="Hashing")
 
     output_path = _resolve_output_path(args.output, fmt, prefix="hash")
     _write_dataframe(df, output_path, fmt)
@@ -263,7 +263,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
         df = scan_directory(root, include=include)
         status.update(f"[bold cyan]Scanned {df.height:,} files")
 
-    df = hash_dataframe(df, algorithm=args.algorithm)
+    df = hash_dataframe(df, algorithm=args.algorithm, desc="Hashing")
 
     output_path = _resolve_output_path(args.output, fmt, prefix="index")
     _write_dataframe(df, output_path, fmt)
