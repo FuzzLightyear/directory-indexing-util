@@ -24,12 +24,6 @@ dirindex scan /path/to/directory -o /output/dir -f json
 
 # Whitelist only image extensions
 dirindex scan /path/to/directory -i jpg,png,gif
-
-# Blacklist build artifacts and logs
-dirindex scan /path/to/directory -x tmp,log,cache,pyc
-
-# Combine: keep source files but skip generated ones
-dirindex scan /path/to/directory -i py,ts,rs -x min.js
 ```
 
 **Arguments:**
@@ -39,10 +33,9 @@ dirindex scan /path/to/directory -i py,ts,rs -x min.js
 | `directory` | Yes | Source directory to scan recursively |
 | `-o`, `--output` | No | Output file path or directory. Directories receive a timestamped filename (`scan_YYYYMMDD_HHMMSS.ext`). Defaults to the current working directory. |
 | `-f`, `--format` | No | Output format: `parquet` (default), `csv`, `json`, `ndjson`. When `-o` specifies a file with a recognized extension, the format is inferred automatically. |
-| `-i`, `--include` | No | Comma-separated whitelist of file extensions to keep (e.g. `jpg,png,gif`). Leading dots and case are normalized. Combinable with `--exclude`. |
-| `-x`, `--exclude` | No | Comma-separated blacklist of file extensions to drop (e.g. `tmp,log,cache`). Leading dots and case are normalized. Combinable with `--include`. |
+| `-i`, `--include` | No | Comma-separated whitelist of file extensions to keep (e.g. `jpg,png,gif`). Leading dots and case are normalized. Files with no extension match the empty string `""`. |
 
-When both flags are given, a file is kept only if its extension is in the include set *and* not in the exclude set. Files with no extension match the empty string `""` for both flags.
+> **Why whitelist only?** Pre-scan filtering matters most when you have a specific intent ("hash my photos"). The opposite case — "scan everything except a few noise extensions" — is cheap to express downstream with a single Polars filter on the resulting index, so a dedicated blacklist flag would add API surface without a meaningful performance win.
 
 ### Scan Output Format
 
