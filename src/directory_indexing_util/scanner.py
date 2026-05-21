@@ -13,7 +13,7 @@ import polars as pl
 
 
 def scan_directory(
-    root: Path,
+    root: Path | str,
     *,
     include: set[str] | None = None,
 ) -> pl.DataFrame:
@@ -26,8 +26,10 @@ def scan_directory(
 
     Parameters
     ----------
-    root : Path
-        Directory to scan.  Must exist and be a directory.
+    root : Path or str
+        Directory to scan.  Must exist and be a directory.  ``str``
+        inputs are accepted for ergonomic library use and converted
+        internally.
     include : set of str, optional
         Whitelist of normalized lowercase extensions (without leading
         dot) to keep.  Files whose extension is not in this set are
@@ -48,7 +50,7 @@ def scan_directory(
     NotADirectoryError
         If *root* exists but is not a directory.
     """
-    root_resolved = root.resolve(strict=True)
+    root_resolved = Path(root).resolve(strict=True)
     if not root_resolved.is_dir():
         raise NotADirectoryError(root_resolved)
 
