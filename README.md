@@ -126,6 +126,53 @@ dirindex index /some/directory
 uv run dirindex index /some/directory
 ```
 
+## Use as a Library
+
+The CLI is a thin wrapper over a stable Python API.  Add the package to your project (`uv add directory-indexing-util`) and import directly:
+
+```python
+from directory_indexing_util import (
+    scan_directory,
+    hash_dataframe,
+    index_directory,
+    ALGORITHMS,
+    DEFAULT_ALGORITHM,
+)
+
+# Scan only — returns a Polars DataFrame with file_name and file_path columns
+df = scan_directory("/path/to/dir", include={"jpg", "png"})
+
+# Hash an existing scan result — adds a file_hash column
+df = hash_dataframe(df, algorithm="sha256")
+
+# One-shot: scan + hash in a single call
+df = index_directory("/path/to/dir", algorithm="blake2b", include={"py"})
+
+# Write with Polars however you like
+df.write_parquet("index.parquet")
+```
+
+All path-accepting functions accept either `pathlib.Path` or `str`.  Functions are silent by default; pass `desc="Hashing"` (or any label) to `hash_dataframe`/`index_directory` to drive a Rich progress bar:
+
+```python
+df = index_directory("/big/library", desc="Indexing photos")
+```
+
+The package ships inline type hints with a [PEP 561](https://peps.python.org/pep-0561/) `py.typed` marker, so mypy, pyright, and IDE language servers in consuming projects pick up the annotations automatically.
+
+**Public API surface:**
+
+| Symbol | Kind | Purpose |
+|---|---|---|
+| `scan_directory(root, *, include=None)` | function | Recursively enumerate files into a DataFrame |
+| `hash_dataframe(df, *, algorithm, desc=None)` | function | Hash files referenced by a DataFrame's `file_path` column |
+| `index_directory(root, *, algorithm, include=None, desc=None)` | function | Scan + hash in one call |
+| `ALGORITHMS` | tuple[str, ...] | Tuple of supported hash algorithm names |
+| `DEFAULT_ALGORITHM` | str | Default algorithm (`"sha256"`) |
+| `__version__` | str | Installed package version |
+
+Anything not in this list (internal modules, CLI helpers, the `progress` utilities) is an implementation detail and may change without notice.
+
 ## Infrastructure
 
 | Tool | Purpose |
