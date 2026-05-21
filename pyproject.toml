@@ -50,10 +50,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Mercury/directory-indexing-util"
-Repository = "https://github.com/Mercury/directory-indexing-util"
-Issues = "https://github.com/Mercury/directory-indexing-util/issues"
-Changelog = "https://github.com/Mercury/directory-indexing-util/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/FuzzLightyear/directory-indexing-util"
+Repository = "https://github.com/FuzzLightyear/directory-indexing-util"
+Issues = "https://github.com/FuzzLightyear/directory-indexing-util/issues"
+Changelog = "https://github.com/FuzzLightyear/directory-indexing-util/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dirindex = "directory_indexing_util.__main__:main"

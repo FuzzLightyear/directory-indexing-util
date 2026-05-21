@@ -7,7 +7,7 @@ Thanks for your interest in improving `directory-indexing-util`. This is a small
 Requirements: Python 3.11+ and [uv](https://github.com/astral-sh/uv).
 
 ```bash
-git clone https://github.com/Mercury/directory-indexing-util.git
+git clone https://github.com/FuzzLightyear/directory-indexing-util.git
 cd directory-indexing-util
 uv sync --extra dev          # installs runtime + dev dependencies
 uv run pre-commit install    # one-time: enables hooks for every commit

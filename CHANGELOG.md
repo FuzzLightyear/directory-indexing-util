@@ -28,4 +28,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MVP feature set tagged as `mvp-complete` — scan, hash, index subcommands operational.
 - Library API surface tagged as `library-ready` — silent-by-default APIs, `Path | str` inputs, public re-exports, py.typed marker.
 
-[Unreleased]: https://github.com/Mercury/directory-indexing-util/compare/...HEAD
+[Unreleased]: https://github.com/FuzzLightyear/directory-indexing-util/compare/...HEAD
