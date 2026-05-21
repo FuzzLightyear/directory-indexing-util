@@ -50,6 +50,7 @@ def index_directory(
     *,
     algorithm: str = DEFAULT_ALGORITHM,
     include: set[str] | None = None,
+    workers: int | None = None,
     desc: str | None = None,
 ) -> pl.DataFrame:
     """Scan *root* and hash every enumerated file in one call.
@@ -58,7 +59,7 @@ def index_directory(
     :func:`hash_dataframe`.  Equivalent to::
 
         df = scan_directory(root, include=include)
-        df = hash_dataframe(df, algorithm=algorithm, desc=desc)
+        df = hash_dataframe(df, algorithm=algorithm, workers=workers, desc=desc)
 
     Parameters
     ----------
@@ -69,6 +70,9 @@ def index_directory(
     include : set of str, optional
         Extension whitelist applied during scanning — see
         :func:`scan_directory` for semantics.
+    workers : int or None, default ``None``
+        Number of worker threads for the hashing phase.  ``None`` uses
+        the auto-tuned default from :func:`hash_dataframe`.
     desc : str or None, default ``None``
         When non-``None``, drives a Rich progress bar during the hashing
         phase.  Library callers leave this as ``None`` for silent
@@ -81,4 +85,4 @@ def index_directory(
         ``file_hash`` (the latter ``Utf8`` and nullable).
     """
     df = scan_directory(root, include=include)
-    return hash_dataframe(df, algorithm=algorithm, desc=desc)
+    return hash_dataframe(df, algorithm=algorithm, workers=workers, desc=desc)

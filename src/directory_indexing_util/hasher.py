@@ -39,18 +39,31 @@ def _hash_file(path: str, algorithm: str) -> str | None:
         return None
 
 
+def _default_workers() -> int:
+    """Return the auto-tuned worker count: ``min(os.cpu_count() * 2, 32)``.
+
+    Returns
+    -------
+    int
+        Worker count derived from available CPUs, capped at 32 to avoid
+        diminishing returns at very high concurrency.
+    """
+    return min((os.cpu_count() or 1) * 2, 32)
+
+
 def hash_dataframe(
     df: pl.DataFrame,
     *,
     algorithm: str = DEFAULT_ALGORITHM,
+    workers: int | None = None,
     desc: str | None = None,
 ) -> pl.DataFrame:
     """Hash files referenced by ``df['file_path']`` and return an extended DataFrame.
 
     Uses ``ThreadPoolExecutor.map`` with ``hashlib.file_digest`` — the
     fastest stdlib strategy per project benchmarks (2,465 MB/s on
-    SHA-256).  Worker count is ``min(os.cpu_count() * 2, 32)`` and order
-    is preserved so the appended column aligns with the input rows.
+    SHA-256).  Order is preserved so the appended column aligns with
+    the input rows.
 
     Parameters
     ----------
@@ -58,6 +71,12 @@ def hash_dataframe(
         Input DataFrame.  Must contain a ``file_path`` column.
     algorithm : str, default ``"sha256"``
         Any algorithm supported by ``hashlib.file_digest``.
+    workers : int or None, default ``None``
+        Number of worker threads.  ``None`` selects the auto-tuned
+        default ``min(os.cpu_count() * 2, 32)`` from project benchmarks.
+        Override when running under CPU quotas, alongside other
+        concurrent workloads, or on hardware where the default
+        saturates I/O.
     desc : str or None, default ``None``
         When non-``None``, drives a Rich progress bar with the given
         label.  Library callers leave this as ``None`` for silent
@@ -72,20 +91,23 @@ def hash_dataframe(
     Raises
     ------
     ValueError
-        If ``file_path`` is missing or *algorithm* is unsupported.
+        If ``file_path`` is missing, *algorithm* is unsupported, or
+        *workers* is not a positive integer.
     """
     if "file_path" not in df.columns:
         raise ValueError("DataFrame must contain a 'file_path' column")
     if algorithm not in hashlib.algorithms_available:
         raise ValueError(f"Unsupported hash algorithm: {algorithm!r}")
+    if workers is not None and workers < 1:
+        raise ValueError(f"workers must be >= 1, got {workers}")
 
     paths = df.get_column("file_path").to_list()
-    workers = min((os.cpu_count() or 1) * 2, 32)
+    worker_count = workers if workers is not None else _default_workers()
 
     def _hash(p: str) -> str | None:
         return _hash_file(p, algorithm)
 
-    with ThreadPoolExecutor(max_workers=workers) as ex:
+    with ThreadPoolExecutor(max_workers=worker_count) as ex:
         iterator = ex.map(_hash, paths)
         if desc is not None:
             iterator = rprogress(iterator, total=len(paths), desc=desc)

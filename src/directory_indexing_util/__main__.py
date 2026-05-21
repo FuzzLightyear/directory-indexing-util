@@ -225,7 +225,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         logger.error("Input file missing required 'file_path' column.")
         raise SystemExit(1)
 
-    df = hash_dataframe(df, algorithm=args.algorithm, desc="Hashing")
+    df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
 
     output_path = _resolve_output_path(args.output, fmt, prefix="hash")
     _write_dataframe(df, output_path, fmt)
@@ -263,7 +263,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
         df = scan_directory(root, include=include)
         status.update(f"[bold cyan]Scanned {df.height:,} files")
 
-    df = hash_dataframe(df, algorithm=args.algorithm, desc="Hashing")
+    df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
 
     output_path = _resolve_output_path(args.output, fmt, prefix="index")
     _write_dataframe(df, output_path, fmt)
@@ -349,6 +349,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_ALGORITHM,
         help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
     )
+    hash_cmd.add_argument(
+        "-w", "--workers",
+        type=int,
+        default=None,
+        help=(
+            "Worker thread count for hashing.  Defaults to an auto-tuned "
+            "value of min(cpu_count * 2, 32).  Lower it under CPU quotas "
+            "or when running multiple instances concurrently."
+        ),
+    )
     hash_cmd.set_defaults(func=_cmd_hash)
 
     index_cmd = sub.add_parser(
@@ -382,6 +392,16 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=ALGORITHMS,
         default=DEFAULT_ALGORITHM,
         help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
+    )
+    index_cmd.add_argument(
+        "-w", "--workers",
+        type=int,
+        default=None,
+        help=(
+            "Worker thread count for hashing.  Defaults to an auto-tuned "
+            "value of min(cpu_count * 2, 32).  Lower it under CPU quotas "
+            "or when running multiple instances concurrently."
+        ),
     )
     index_cmd.set_defaults(func=_cmd_index)
 
