@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
@@ -41,7 +41,7 @@ def _resolve_output_path(output: str | None, fmt: str) -> Path:
     Path
         Resolved absolute path for the output file.
     """
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     filename = f"scan_{ts}.{fmt}"
 
     if output is None:
