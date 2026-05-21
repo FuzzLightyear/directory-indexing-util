@@ -241,6 +241,44 @@ def _cmd_hash(args: argparse.Namespace) -> None:
     console.print(f"[green]{df.height:,}[/green] hashes -> [bold]{output_path}[/bold]")
 
 
+def _cmd_index(args: argparse.Namespace) -> None:
+    """Execute the ``index`` subcommand — scan + hash in a single pass."""
+    root = Path(args.directory)
+    if not root.exists():
+        logger.error("Directory does not exist: {}", root)
+        raise SystemExit(1)
+    if not root.is_dir():
+        logger.error("Not a directory: {}", root)
+        raise SystemExit(1)
+
+    fmt = args.format
+    if args.output and not Path(args.output).is_dir():
+        suffix = Path(args.output).suffix.lstrip(".")
+        if suffix in _FORMATS and fmt == _DEFAULT_FORMAT:
+            fmt = suffix
+
+    include = _parse_extensions(args.include)
+
+    with console.status("[bold cyan]Scanning…") as status:
+        df = scan_directory(root, include=include)
+        status.update(f"[bold cyan]Scanned {df.height:,} files")
+
+    df = hash_dataframe(df, algorithm=args.algorithm)
+
+    output_path = _resolve_output_path(args.output, fmt, prefix="index")
+    _write_dataframe(df, output_path, fmt)
+    _write_manifest(
+        output_path.with_suffix(".meta.json"),
+        command="index",
+        input_path=str(root.resolve()),
+        output_path=str(output_path),
+        algorithm=args.algorithm,
+        file_count=df.height,
+    )
+
+    console.print(f"[green]{df.height:,}[/green] indexed -> [bold]{output_path}[/bold]")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser with subcommands.
 
@@ -312,6 +350,40 @@ def _build_parser() -> argparse.ArgumentParser:
         help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
     )
     hash_cmd.set_defaults(func=_cmd_hash)
+
+    index_cmd = sub.add_parser(
+        "index",
+        help="Scan a directory and hash all files in a single pass.",
+    )
+    index_cmd.add_argument("directory", help="Source directory to scan and hash.")
+    index_cmd.add_argument(
+        "-o", "--output",
+        help=(
+            "Output file path or directory.  When a directory is given, a "
+            "timestamped filename is generated automatically.  "
+            "Defaults to the current working directory."
+        ),
+    )
+    index_cmd.add_argument(
+        "-f", "--format",
+        choices=_FORMATS,
+        default=_DEFAULT_FORMAT,
+        help=f"Output file format (default: {_DEFAULT_FORMAT}).",
+    )
+    index_cmd.add_argument(
+        "-i", "--include",
+        help=(
+            "Comma-separated whitelist of file extensions to keep "
+            "(e.g., 'jpg,png,gif').  Leading dots and case are normalized."
+        ),
+    )
+    index_cmd.add_argument(
+        "-a", "--algorithm",
+        choices=ALGORITHMS,
+        default=DEFAULT_ALGORITHM,
+        help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
+    )
+    index_cmd.set_defaults(func=_cmd_index)
 
     return parser
 
