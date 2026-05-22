@@ -49,6 +49,34 @@ def _get_version() -> str:
         return "0.0.0+unknown"
 
 
+def _infer_format(args: argparse.Namespace) -> str:
+    """Determine the effective output format for a command invocation.
+
+    When the user supplied ``-o`` as a *file path* (not a directory) and
+    its extension is one of the recognised formats, that extension wins
+    over the argparse-default format — letting ``-o report.csv`` Just
+    Work without also requiring ``-f csv``.  An explicit ``-f`` (i.e.,
+    something other than the default) is always respected.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed arguments.  Must have ``output`` (``str`` or ``None``)
+        and ``format`` (member of :data:`_FORMATS`) attributes.
+
+    Returns
+    -------
+    str
+        Final format string (one of :data:`_FORMATS`).
+    """
+    fmt = args.format
+    if args.output and not Path(args.output).is_dir():
+        suffix = Path(args.output).suffix.lstrip(".").lower()
+        if suffix in _FORMATS and fmt == _DEFAULT_FORMAT:
+            fmt = suffix
+    return fmt
+
+
 def _parse_extensions(value: str | None) -> set[str] | None:
     """Parse a comma-separated extension list into a normalized set.
 
@@ -229,11 +257,7 @@ def _cmd_scan(args: argparse.Namespace) -> None:
         logger.error("Not a directory: {}", root)
         raise SystemExit(1)
 
-    fmt = args.format
-    if args.output and not Path(args.output).is_dir():
-        suffix = Path(args.output).suffix.lstrip(".")
-        if suffix in _FORMATS and fmt == _DEFAULT_FORMAT:
-            fmt = suffix
+    fmt = _infer_format(args)
 
     include = _parse_extensions(args.include)
 
@@ -264,11 +288,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         logger.error("Not a file: {}", input_path)
         raise SystemExit(1)
 
-    fmt = args.format
-    if args.output and not Path(args.output).is_dir():
-        suffix = Path(args.output).suffix.lstrip(".")
-        if suffix in _FORMATS and fmt == _DEFAULT_FORMAT:
-            fmt = suffix
+    fmt = _infer_format(args)
 
     try:
         df = _read_dataframe(input_path)
@@ -319,11 +339,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
         logger.error("Not a directory: {}", root)
         raise SystemExit(1)
 
-    fmt = args.format
-    if args.output and not Path(args.output).is_dir():
-        suffix = Path(args.output).suffix.lstrip(".")
-        if suffix in _FORMATS and fmt == _DEFAULT_FORMAT:
-            fmt = suffix
+    fmt = _infer_format(args)
 
     include = _parse_extensions(args.include)
 
