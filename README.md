@@ -6,6 +6,8 @@ Designed for two primary use cases:
 1. **Full index** — enumerate files and compute content hashes for deduplication or integrity verification.
 2. **Collection only** — enumerate files and metadata without hashing.
 
+> **Maintenance status:** Personal project, casually maintained. **Issues are welcome** for bugs and feature requests. **External pull requests are not accepted** — fork freely under MIT for your own changes. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Usage
 
 ### Scanning

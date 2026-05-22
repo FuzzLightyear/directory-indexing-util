@@ -1,8 +1,23 @@
 # Contributing
 
-Thanks for your interest in improving `directory-indexing-util`. This is a small, opinionated project; the guidance below keeps the bar high and the iteration fast.
+This is a personal project, maintained casually. **External pull requests are not accepted, but issues are welcome and the supported channel for reporting bugs or suggesting features.**
 
-## Development setup
+## Filing an issue
+
+The "New Issue" page offers two templates:
+
+- **Bug report** — for incorrect or surprising behaviour.
+- **Feature request** — for missing capabilities or API gaps.
+
+A good issue includes enough information for a single-pass fix: minimal reproduction, expected vs. actual output, environment details. The templates prompt for these.
+
+## Security
+
+If you believe you've found a vulnerability, please **do not** open a public issue. See [`SECURITY.md`](SECURITY.md) for the private reporting process.
+
+## Working with the code locally
+
+The MIT license permits you to fork and modify the project freely. These instructions are provided for your convenience if you want to run the dev setup on your own copy; merging your changes back upstream is not the intended workflow.
 
 Requirements: Python 3.11+ and [uv](https://github.com/astral-sh/uv).
 
@@ -34,31 +49,15 @@ uv run research/benchmarks/hashing_benchmark.py
 uv run research/benchmarks/scanning_benchmark.py
 ```
 
-## Branching and commits
+## Maintainer conventions
 
-- **Branch from `main`**, never commit to it directly. Name branches after the work: `feat/<feature>`, `fix/<issue>`, `docs/<topic>`, `perf/<area>`, `research/<topic>`.
-- **Atomic commits.** Each commit should be one logical change with a focused message. Avoid "WIP" or "fixes" — squash locally before pushing.
-- **Commit message style** matches the existing history: imperative subject (≤ 72 chars), blank line, body explaining the *why* (not the *what* — the diff already shows what). Co-author trailer for collaborators.
+These apply to the maintainer's own commits; they're documented here so the project's history stays legible.
+
+- **Branch from `main`**, never commit directly. Name branches after the work: `feat/<feature>`, `fix/<issue>`, `docs/<topic>`, `perf/<area>`, `research/<topic>`.
+- **Atomic commits.** Each commit is one logical change with a focused message. Imperative subject (≤ 72 chars), blank line, body explaining the *why* (not the *what* — the diff already shows what).
 - **No comments in code** other than the file-header copyright/SPDX banner; behavioural notes belong in numpydoc-style docstrings (`Notes`, `Parameters`, `Returns`).
+- **Merge strategy:** squash-merge to keep `main` linear. For substantive phase milestones, the tip of the feature branch is tagged with an annotated tag *before* the squash so the granular development history stays reachable. Tag names are short, descriptive, and unversioned; release tags use semver (`v0.1.0`).
 
-## Pull requests
+## Maintenance status
 
-- One PR per logical change.
-- Update `CHANGELOG.md`'s `[Unreleased]` section with a one-line entry under the appropriate heading (`Added`, `Changed`, `Fixed`, `Removed`, `Security`).
-- Ensure `uv run pytest` and `uv run ruff check` both pass.
-- The PR template will prompt you to confirm the above.
-
-## Merge strategy
-
-- We **squash-merge** PRs to keep `main` linear.
-- For substantive phase milestones (feature complete, research complete, refactor complete), the maintainer tags the **tip of the feature branch before merge** with an annotated tag (e.g., `mvp-complete`, `library-ready`). This preserves the granular commit history that the squash would otherwise collapse. Tag names are short, descriptive, and unversioned; release tags use semver (`v0.1.0`).
-
-## Code style
-
-- Public functions and classes have numpydoc-style docstrings with `Parameters`, `Returns`, `Raises`, and `Notes` as applicable.
-- Type hints on every public signature; the package ships a `py.typed` marker so consumers' type checkers pick them up.
-- Cross-platform: any code touching paths must work on Windows and Linux (no hardcoded separators, no platform-specific syscalls without a guard).
-
-## Security
-
-If you believe you've found a vulnerability, please **do not** open a public issue. See `SECURITY.md` for the private reporting process.
+This project is maintained on a personal schedule with no commercial response-time commitment. Issues will be triaged and addressed when time and interest allow.
