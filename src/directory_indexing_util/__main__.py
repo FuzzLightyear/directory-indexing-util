@@ -4,6 +4,14 @@
 """CLI entry point for directory-indexing-util.
 
 Run via ``dirindex`` (installed script) or ``python -m directory_indexing_util``.
+
+Notes
+-----
+Module-level imports are intentionally limited to stdlib plus the dependency-free
+:mod:`directory_indexing_util._algorithms` module.  This keeps ``dirindex --version``
+and ``dirindex --help`` fast by avoiding the cost of loading polars, rich, and
+loguru when no command will actually run.  Command handlers import what they
+need at call time.
 """
 
 from __future__ import annotations
@@ -12,20 +20,33 @@ import argparse
 import json
 import sys
 from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import polars as pl
-from loguru import logger
-from rich.console import Console
+from directory_indexing_util._algorithms import ALGORITHMS, DEFAULT_ALGORITHM
 
-from directory_indexing_util import __version__
-from directory_indexing_util.hasher import ALGORITHMS, DEFAULT_ALGORITHM, hash_dataframe
-from directory_indexing_util.scanner import scan_directory
+if TYPE_CHECKING:
+    import polars as pl
 
 _FORMATS = ("parquet", "csv", "json", "ndjson")
 _DEFAULT_FORMAT = "parquet"
 
-console = Console()
+
+def _get_version() -> str:
+    """Return the installed package version, or a sentinel if uninstalled.
+
+    Returns
+    -------
+    str
+        Package version string read from installed metadata, or
+        ``"0.0.0+unknown"`` if the package cannot be located (e.g.,
+        running directly from source without an editable install).
+    """
+    try:
+        return version("directory-indexing-util")
+    except PackageNotFoundError:  # pragma: no cover - only without install
+        return "0.0.0+unknown"
 
 
 def _parse_extensions(value: str | None) -> set[str] | None:
@@ -87,11 +108,18 @@ def _write_dataframe(df: pl.DataFrame, path: Path, fmt: str) -> None:
     Parameters
     ----------
     df : pl.DataFrame
-        DataFrame to write.
+        DataFrame to write.  The methods called are bound to the
+        instance, so this helper does not import polars itself.
     path : Path
         Destination file path.
     fmt : str
         One of ``parquet``, ``csv``, ``json``, ``ndjson``.
+
+    Raises
+    ------
+    ValueError
+        If *fmt* is not a recognised format — defensive check, since
+        argparse validates this for CLI use.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "parquet":
@@ -102,6 +130,8 @@ def _write_dataframe(df: pl.DataFrame, path: Path, fmt: str) -> None:
         df.write_json(path)
     elif fmt == "ndjson":
         df.write_ndjson(path)
+    else:
+        raise ValueError(f"Unsupported output format: {fmt!r}")
 
 
 def _read_dataframe(path: Path) -> pl.DataFrame:
@@ -122,6 +152,8 @@ def _read_dataframe(path: Path) -> pl.DataFrame:
     ValueError
         If the file extension is not a supported format.
     """
+    import polars as pl  # noqa: PLC0415 - lazy import keeps --help/--version fast
+
     ext = path.suffix.lstrip(".").lower()
     if ext == "parquet":
         return pl.read_parquet(path)
@@ -174,6 +206,13 @@ def _write_manifest(
 
 def _cmd_scan(args: argparse.Namespace) -> None:
     """Execute the ``scan`` subcommand."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+    from rich.console import Console  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
+
+    console = Console()
+
     root = Path(args.directory)
     if not root.exists():
         logger.error("Directory does not exist: {}", root)
@@ -202,6 +241,13 @@ def _cmd_scan(args: argparse.Namespace) -> None:
 
 def _cmd_hash(args: argparse.Namespace) -> None:
     """Execute the ``hash`` subcommand."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+    from rich.console import Console  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
+
+    console = Console()
+
     input_path = Path(args.input)
     if not input_path.exists():
         logger.error("Input file does not exist: {}", input_path)
@@ -244,6 +290,14 @@ def _cmd_hash(args: argparse.Namespace) -> None:
 
 def _cmd_index(args: argparse.Namespace) -> None:
     """Execute the ``index`` subcommand — scan + hash in a single pass."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+    from rich.console import Console  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
+    from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
+
+    console = Console()
+
     root = Path(args.directory)
     if not root.exists():
         logger.error("Directory does not exist: {}", root)
@@ -295,7 +349,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-V", "--version",
         action="version",
-        version=f"%(prog)s {__version__}",
+        version=f"%(prog)s {_get_version()}",
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -422,6 +476,8 @@ def main() -> None:
     if not hasattr(args, "func"):
         parser.print_help()
         raise SystemExit(0)
+
+    from loguru import logger  # noqa: PLC0415 - lazy, only when a command runs
 
     logger.remove()
     logger.add(sys.stderr, level="INFO", format="{message}")
