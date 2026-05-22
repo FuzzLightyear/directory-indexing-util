@@ -1,12 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "directory-indexing-util"
 version = "0.1.0"
 description = "Performant, security-minded directory walking, file hashing, and indexing"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "FuzzLightyear", email = "71232482+FuzzLightyear@users.noreply.github.com" },
+]
+keywords = [
+    "directory",
+    "indexing",
+    "scanning",
+    "hashing",
+    "file-hash",
+    "polars",
+    "sha256",
+    "checksum",
+    "deduplication",
+    "integrity",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: System :: Filesystems",
+    "Topic :: System :: Archiving",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = [
     "polars>=1.0",
     "loguru>=0.7",
+    "rich>=13.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/FuzzLightyear/directory-indexing-util"
+Repository = "https://github.com/FuzzLightyear/directory-indexing-util"
+Issues = "https://github.com/FuzzLightyear/directory-indexing-util/issues"
+Changelog = "https://github.com/FuzzLightyear/directory-indexing-util/blob/main/CHANGELOG.md"
+
+[project.scripts]
+dirindex = "directory_indexing_util.__main__:main"
 
 [project.optional-dependencies]
 dev = [
@@ -20,13 +70,20 @@ research = [
     "tqdm-joblib>=0.0.4",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/directory_indexing_util"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+extend-exclude = ["research/benchmarks/verify_progress.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "S", "B", "A", "C4", "PT"]
 ignore = ["S603", "S607"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
