@@ -11,10 +11,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
 
+from directory_indexing_util._algorithms import ALGORITHMS, DEFAULT_ALGORITHM
 from directory_indexing_util.progress import rprogress
 
-ALGORITHMS: tuple[str, ...] = ("sha256", "sha512", "blake2b", "md5")
-DEFAULT_ALGORITHM = "sha256"
+__all__ = ["ALGORITHMS", "DEFAULT_ALGORITHM", "hash_dataframe"]
 
 
 def _hash_file(path: str, algorithm: str) -> str | None:

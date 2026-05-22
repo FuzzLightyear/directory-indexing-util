@@ -22,18 +22,19 @@ default in :data:`DEFAULT_ALGORITHM`.
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import polars as pl
 
-from directory_indexing_util.hasher import (
-    ALGORITHMS,
-    DEFAULT_ALGORITHM,
-    hash_dataframe,
-)
+from directory_indexing_util._algorithms import ALGORITHMS, DEFAULT_ALGORITHM
+from directory_indexing_util.hasher import hash_dataframe
 from directory_indexing_util.scanner import scan_directory
 
-__version__ = "0.1.0"
+try:
+    __version__: str = version("directory-indexing-util")
+except PackageNotFoundError:  # pragma: no cover - only triggered without install
+    __version__ = "0.0.0+unknown"
 
 __all__ = [
     "ALGORITHMS",
