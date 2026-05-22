@@ -18,6 +18,7 @@ import polars as pl
 from loguru import logger
 from rich.console import Console
 
+from directory_indexing_util import __version__
 from directory_indexing_util.hasher import ALGORITHMS, DEFAULT_ALGORITHM, hash_dataframe
 from directory_indexing_util.scanner import scan_directory
 
@@ -290,6 +291,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dirindex",
         description="Performant, security-minded directory indexing utility.",
+    )
+    parser.add_argument(
+        "-V", "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     sub = parser.add_subparsers(dest="command")
 
