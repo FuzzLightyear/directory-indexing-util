@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import polars as pl
+import pytest
 
 from directory_indexing_util import __version__
 
@@ -141,3 +142,279 @@ def test_index_summary_flags_unreadable_count(tmp_path: Path) -> None:
     out = tmp_path / "hashed.parquet"
     result = _run("hash", str(scan_path), "-o", str(out))
     assert "1 unreadable" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# scan subcommand
+# ---------------------------------------------------------------------------
+
+
+def test_scan_writes_parquet_with_documented_schema(tmp_path: Path) -> None:
+    """``dirindex scan`` produces the two-column scan output spec."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.txt").write_text("a")
+    (src / "b.txt").write_text("b")
+
+    out = tmp_path / "scan.parquet"
+    _run("scan", str(src), "-o", str(out))
+
+    df = pl.read_parquet(out)
+    assert df.height == 2
+    assert df.columns == ["file_name", "file_path"]
+
+
+def test_scan_with_include_filter_via_cli(tmp_path: Path) -> None:
+    """``-i py`` whitelists only .py extensions; behaviour parallels the library API."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "keep.py").write_text("a")
+    (src / "drop.txt").write_text("b")
+
+    out = tmp_path / "scan.parquet"
+    _run("scan", str(src), "-o", str(out), "-i", "py")
+
+    df = pl.read_parquet(out)
+    assert df.height == 1
+    assert df.get_column("file_name")[0] == "keep.py"
+
+
+def test_scan_format_inferred_from_extension(tmp_path: Path) -> None:
+    """``-o output.csv`` infers CSV without needing ``-f csv``."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.txt").write_text("a")
+
+    out = tmp_path / "out.csv"
+    _run("scan", str(src), "-o", str(out))
+
+    assert out.exists()
+    df = pl.read_csv(out)
+    assert df.height == 1
+
+
+def test_scan_to_directory_creates_timestamped_file(tmp_path: Path) -> None:
+    """When ``-o`` is a directory, a timestamped ``scan_*.parquet`` is written inside."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.txt").write_text("a")
+
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    _run("scan", str(src), "-o", str(out_dir))
+
+    files = list(out_dir.iterdir())
+    assert len(files) == 1
+    assert files[0].name.startswith("scan_")
+    assert files[0].suffix == ".parquet"
+
+
+def test_scan_missing_directory_exits_nonzero(tmp_path: Path) -> None:
+    """A non-existent source directory fails fast with exit code 1."""
+    result = _run("scan", str(tmp_path / "nope"), check=False)
+    assert result.returncode == 1
+
+
+def test_scan_file_argument_exits_nonzero(tmp_path: Path) -> None:
+    """Passing a file instead of a directory fails fast with exit code 1."""
+    f = tmp_path / "file.txt"
+    f.write_text("x")
+    result = _run("scan", str(f), check=False)
+    assert result.returncode == 1
+
+
+# ---------------------------------------------------------------------------
+# hash subcommand
+# ---------------------------------------------------------------------------
+
+
+def test_hash_round_trip_after_scan(tmp_path: Path) -> None:
+    """End-to-end: scan → hash file via subprocess → verify schema extends scan."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"alpha")
+
+    scan_out = tmp_path / "scan.parquet"
+    _run("scan", str(src), "-o", str(scan_out))
+
+    hash_out = tmp_path / "hash.parquet"
+    _run("hash", str(scan_out), "-o", str(hash_out))
+
+    df = pl.read_parquet(hash_out)
+    assert df.columns == ["file_name", "file_path", "file_hash"]
+    assert df.get_column("file_hash")[0] is not None
+
+
+def test_hash_missing_file_path_column_fails(tmp_path: Path) -> None:
+    """An input file without ``file_path`` is rejected with exit code 1."""
+    bad = tmp_path / "bad.parquet"
+    pl.DataFrame({"file_name": ["x"], "other": ["y"]}).write_parquet(bad)
+
+    out = tmp_path / "hash.parquet"
+    result = _run("hash", str(bad), "-o", str(out), check=False)
+    assert result.returncode == 1
+    assert "file_path" in result.stderr
+
+
+def test_hash_missing_input_file_fails(tmp_path: Path) -> None:
+    """A non-existent input file fails fast with exit code 1."""
+    result = _run("hash", str(tmp_path / "nope.parquet"), check=False)
+    assert result.returncode == 1
+
+
+@pytest.mark.parametrize("algorithm", ["sha256", "sha512", "blake2b", "md5"])
+def test_hash_with_each_algorithm(tmp_path: Path, algorithm: str) -> None:
+    """The ``-a`` flag exercises each supported algorithm end-to-end."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    scan_out = tmp_path / "scan.parquet"
+    _run("scan", str(src), "-o", str(scan_out))
+
+    hash_out = tmp_path / "hash.parquet"
+    _run("hash", str(scan_out), "-o", str(hash_out), "-a", algorithm)
+
+    manifest = json.loads(hash_out.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    assert manifest["hash_algorithm"] == algorithm
+
+
+def test_hash_unsupported_input_format_fails(tmp_path: Path) -> None:
+    """An input with an unrecognised extension fails with exit code 1."""
+    bad = tmp_path / "data.bogus"
+    bad.write_text("not anything")
+
+    result = _run("hash", str(bad), check=False)
+    assert result.returncode == 1
+
+
+def test_hash_explicit_workers_flag_works(tmp_path: Path) -> None:
+    """``-w 2`` is accepted and produces correct results."""
+    src = tmp_path / "data"
+    src.mkdir()
+    for i in range(5):
+        (src / f"f{i}.bin").write_bytes(b"x")
+
+    scan_out = tmp_path / "scan.parquet"
+    _run("scan", str(src), "-o", str(scan_out))
+
+    hash_out = tmp_path / "hash.parquet"
+    _run("hash", str(scan_out), "-o", str(hash_out), "-w", "2")
+
+    df = pl.read_parquet(hash_out)
+    assert df.height == 5
+    assert df.get_column("file_hash").null_count() == 0
+
+
+# ---------------------------------------------------------------------------
+# index subcommand
+# ---------------------------------------------------------------------------
+
+
+def test_index_produces_full_schema(tmp_path: Path) -> None:
+    """``dirindex index`` writes the full three-column schema in one pass."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"alpha")
+    (src / "b.bin").write_bytes(b"beta")
+
+    out = tmp_path / "index.parquet"
+    _run("index", str(src), "-o", str(out))
+
+    df = pl.read_parquet(out)
+    assert df.columns == ["file_name", "file_path", "file_hash"]
+    assert df.height == 2
+
+
+def test_index_with_all_options(tmp_path: Path) -> None:
+    """``index`` with -i / -a / -w / -f / -o all wired correctly together."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "keep.py").write_bytes(b"x")
+    (src / "drop.txt").write_bytes(b"x")
+
+    out = tmp_path / "out.json"
+    _run("index", str(src), "-o", str(out), "-i", "py", "-a", "sha512", "-w", "1", "-f", "json")
+
+    assert out.exists()
+    manifest = json.loads(out.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    assert manifest["hash_algorithm"] == "sha512"
+    assert manifest["file_count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Manifest contract
+# ---------------------------------------------------------------------------
+
+
+def test_manifest_has_all_documented_fields(tmp_path: Path) -> None:
+    """Every documented manifest key is present and well-typed."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    out = tmp_path / "index.parquet"
+    _run("index", str(src), "-o", str(out))
+
+    manifest = json.loads(out.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    expected_keys = {
+        "command",
+        "input_path",
+        "output_path",
+        "hash_algorithm",
+        "file_count",
+        "failed_count",
+        "created_at",
+    }
+    assert set(manifest.keys()) == expected_keys
+    assert manifest["command"] == "index"
+    assert isinstance(manifest["file_count"], int)
+    assert isinstance(manifest["failed_count"], int)
+    assert isinstance(manifest["created_at"], str)
+    # ISO 8601 timestamps end with a timezone designator
+    assert "+" in manifest["created_at"] or manifest["created_at"].endswith("Z")
+
+
+def test_manifest_input_path_is_absolute(tmp_path: Path) -> None:
+    """``input_path`` is recorded as an absolute path for unambiguous provenance."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    out = tmp_path / "out.parquet"
+    _run("index", str(src), "-o", str(out))
+
+    manifest = json.loads(out.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    assert Path(manifest["input_path"]).is_absolute()
+
+
+def test_manifest_uses_utf8_and_lf(tmp_path: Path) -> None:
+    """Manifest is byte-identical across platforms: UTF-8, LF line endings."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    out = tmp_path / "out.parquet"
+    _run("index", str(src), "-o", str(out))
+
+    raw = out.with_suffix(".meta.json").read_bytes()
+    # UTF-8 decodable
+    raw.decode("utf-8")
+    # No CRLF — write_text(newline="") preserved the json.dumps LF endings
+    assert b"\r\n" not in raw
+
+
+# ---------------------------------------------------------------------------
+# Top-level CLI behaviour
+# ---------------------------------------------------------------------------
+
+
+def test_no_subcommand_prints_help_with_exit_zero() -> None:
+    """Invoking ``dirindex`` with no subcommand prints help and exits 0."""
+    result = _run(check=False)
+    assert result.returncode == 0
+    assert "usage" in result.stdout.lower()
+    # All three subcommands are listed
+    assert "scan" in result.stdout
+    assert "hash" in result.stdout
+    assert "index" in result.stdout
