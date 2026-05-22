@@ -174,6 +174,7 @@ def _write_manifest(
     output_path: str,
     algorithm: str,
     file_count: int,
+    failed_count: int,
 ) -> None:
     """Write a JSON sidecar manifest documenting the run.
 
@@ -191,7 +192,13 @@ def _write_manifest(
     algorithm : str
         Hash algorithm used for the run.
     file_count : int
-        Number of rows in the produced index.
+        Total number of rows in the produced index.
+    failed_count : int
+        Subset of *file_count* for which ``file_hash`` is ``null`` —
+        files that existed at scan time but could not be opened or read
+        during hashing (e.g., deleted in between, permissions changed,
+        locked by another process).  ``0`` when every file hashed
+        successfully.
     """
     payload = {
         "command": command,
@@ -199,6 +206,7 @@ def _write_manifest(
         "output_path": output_path,
         "hash_algorithm": algorithm,
         "file_count": file_count,
+        "failed_count": failed_count,
         "created_at": datetime.now(UTC).isoformat(),
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8", newline="")
@@ -273,6 +281,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
     df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
+    failed_count = int(df.get_column("file_hash").null_count())
 
     output_path = _resolve_output_path(args.output, fmt, prefix="hash")
     _write_dataframe(df, output_path, fmt)
@@ -283,9 +292,13 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         output_path=str(output_path),
         algorithm=args.algorithm,
         file_count=df.height,
+        failed_count=failed_count,
     )
 
-    console.print(f"[green]{df.height:,}[/green] hashes -> [bold]{output_path}[/bold]")
+    summary = f"[green]{df.height:,}[/green] hashes"
+    if failed_count:
+        summary += f" ([yellow]{failed_count} unreadable[/yellow])"
+    console.print(f"{summary} -> [bold]{output_path}[/bold]")
 
 
 def _cmd_index(args: argparse.Namespace) -> None:
@@ -319,6 +332,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
         status.update(f"[bold cyan]Scanned {df.height:,} files")
 
     df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
+    failed_count = int(df.get_column("file_hash").null_count())
 
     output_path = _resolve_output_path(args.output, fmt, prefix="index")
     _write_dataframe(df, output_path, fmt)
@@ -329,9 +343,13 @@ def _cmd_index(args: argparse.Namespace) -> None:
         output_path=str(output_path),
         algorithm=args.algorithm,
         file_count=df.height,
+        failed_count=failed_count,
     )
 
-    console.print(f"[green]{df.height:,}[/green] indexed -> [bold]{output_path}[/bold]")
+    summary = f"[green]{df.height:,}[/green] indexed"
+    if failed_count:
+        summary += f" ([yellow]{failed_count} unreadable[/yellow])"
+    console.print(f"{summary} -> [bold]{output_path}[/bold]")
 
 
 def _build_parser() -> argparse.ArgumentParser:
