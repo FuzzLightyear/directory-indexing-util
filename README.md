@@ -111,11 +111,24 @@ Every `hash` or `index` invocation also writes a JSON manifest beside the data f
   "output_path": "index_20260521_064744.parquet",
   "hash_algorithm": "sha256",
   "file_count": 1234,
+  "failed_count": 0,
   "created_at": "2026-05-21T06:47:44.000000+00:00"
 }
 ```
 
-**Why a sidecar instead of an extra column?** Run metadata (algorithm, input directory, output path, timestamp) is per-run, not per-row. A constant column would be a strict subset of this information *and* redundant on every row. The sidecar captures full provenance once.
+| Field | Purpose |
+|---|---|
+| `command` | Subcommand that produced the output (`"hash"` or `"index"`). |
+| `input_path` | Absolute path of the input — scan file for `hash`, source directory for `index`. |
+| `output_path` | Data file written alongside this manifest. |
+| `hash_algorithm` | Algorithm used (`sha256`, `sha512`, `blake2b`, `md5`). |
+| `file_count` | Total rows in the produced index. |
+| `failed_count` | Subset of `file_count` whose `file_hash` is `null` (file unreadable at hash time). `0` when every file hashed cleanly. |
+| `created_at` | ISO 8601 UTC timestamp. |
+
+The manifest is UTF-8 encoded with LF line endings on every platform, so the file is byte-identical regardless of the producing OS.
+
+**Why a sidecar instead of an extra column?** Run metadata (algorithm, input directory, output path, timestamp, counts) is per-run, not per-row. Constant columns would be a strict subset of this information *and* redundant on every row. The sidecar captures full provenance once.
 
 ## Running via uv
 
@@ -127,6 +140,9 @@ dirindex index /some/directory
 
 # Without explicit install, uv resolves the entry point on demand
 uv run dirindex index /some/directory
+
+# Inspect the installed version (instant — no heavy imports)
+dirindex --version
 ```
 
 ## Use as a Library
@@ -207,13 +223,14 @@ Notable cross-platform considerations the package already handles:
 
 ```
 src/directory_indexing_util/
-    __init__.py         Package metadata
+    __init__.py         Public API and __version__
     __main__.py         CLI entry point (dirindex)
+    _algorithms.py      Stdlib-only hash algorithm constants
     scanner.py          Iterative os.scandir directory traversal
     hasher.py           Parallel file hashing (ThreadPoolExecutor + hashlib.file_digest)
     progress.py         Rich progress utilities (ms-precision elapsed, it/s)
+tests/                  pytest suite covering library + CLI
 research/               Pre-implementation benchmarks, methodology, and findings
-tests/                  Test suite (forthcoming)
 pyproject.toml          Project metadata and dependency specification
 ```
 
