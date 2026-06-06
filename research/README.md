@@ -73,9 +73,9 @@ Strategies are tagged by dependency cost to evaluate the trade-off between perfo
 ## Running the Benchmarks
 
 ```bash
-uv run --group research research/benchmarks/generate_test_data.py
-uv run --group research research/benchmarks/hashing_benchmark.py [directory]
-uv run --group research research/benchmarks/scanning_benchmark.py [directory]
+uv run --extra research research/benchmarks/generate_test_data.py
+uv run --extra research research/benchmarks/hashing_benchmark.py [directory]
+uv run --extra research research/benchmarks/scanning_benchmark.py [directory]
 ```
 
 If no directory is given, synthetic test data is generated automatically.
