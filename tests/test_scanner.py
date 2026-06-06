@@ -249,3 +249,29 @@ def test_symlink_to_directory_is_not_traversed(tmp_path: Path) -> None:
     names = set(df.get_column("file_name").to_list())
     assert names == {"main.txt", "deep.txt"}
     # deep.txt appears only via the real `other` directory, never via the symlink
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="NTFS junctions are Windows-only")
+def test_junction_cycle_does_not_crash(tmp_path: Path) -> None:
+    """A self-referential NTFS junction is entered once, not followed into a loop."""
+    import subprocess
+
+    (tmp_path / "a.txt").write_text("x")
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "b.txt").write_text("y")
+    loop = sub / "loop"
+    result = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(loop), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        pytest.skip(f"could not create junction: {result.stderr.strip()}")
+
+    df = scan_directory(tmp_path)  # must return without raising
+
+    names = df.get_column("file_name").to_list()
+    assert "a.txt" in names
+    assert "b.txt" in names
+    assert names.count("a.txt") == 1  # the cycle does not duplicate entries
