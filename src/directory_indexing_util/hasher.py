@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat
 from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
@@ -17,22 +18,56 @@ from directory_indexing_util.progress import rprogress
 __all__ = ["ALGORITHMS", "DEFAULT_ALGORITHM", "hash_dataframe"]
 
 
+def _is_non_local_path(path: str) -> bool:
+    """Return ``True`` for UNC or network paths.
+
+    Parameters
+    ----------
+    path : str
+        Candidate filesystem path.
+
+    Returns
+    -------
+    bool
+        ``True`` when *path* begins with two path separators, the UNC or
+        network form.
+
+    Notes
+    -----
+    Accessing such a path can trigger an outbound network authentication,
+    so it is rejected before any ``stat`` or ``open`` call.
+    """
+    return path[:2] in ("\\\\", "//")
+
+
 def _hash_file(path: str, algorithm: str) -> str | None:
     """Compute a hex digest of *path*.
 
     Parameters
     ----------
     path : str
-        Absolute path to the file.
+        Absolute path to a local regular file.
     algorithm : str
         ``hashlib`` algorithm name (e.g., ``"sha256"``).
 
     Returns
     -------
     str or None
-        Lowercase hex digest, or ``None`` if the file cannot be opened.
+        Lowercase hex digest, or ``None`` if *path* is not a local regular
+        file or cannot be opened.
+
+    Notes
+    -----
+    UNC and network paths, symlinks, and non-regular files (directories,
+    devices, FIFOs, sockets) are skipped rather than opened.  The path is
+    classified with ``os.stat(follow_symlinks=False)`` before opening so a
+    crafted input cannot steer hashing at an unintended target.
     """
     try:
+        if _is_non_local_path(path):
+            return None
+        if not stat.S_ISREG(os.stat(path, follow_symlinks=False).st_mode):
+            return None
         with open(path, "rb") as f:  # noqa: S324 - algorithm is caller-validated
             return hashlib.file_digest(f, algorithm).hexdigest()
     except (PermissionError, OSError):
