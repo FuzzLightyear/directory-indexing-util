@@ -1,6 +1,6 @@
 # directory-indexing-util
 
-A maximally performant, security-minded utility for recursively walking directory trees, hashing files, and producing a structured index. Collects file hashes, paths, sizes, and metadata into a Polars DataFrame exportable as Parquet, CSV, JSON, or NDJSON.
+A maximally performant, security-minded utility for recursively walking directory trees, hashing files, and producing a structured index. Collects file paths and content hashes into a Polars DataFrame exportable as Parquet, CSV, JSON, or NDJSON.
 
 Designed for two primary use cases:
 1. **Full index** — enumerate files and compute content hashes for deduplication or integrity verification.
@@ -184,8 +184,8 @@ The package ships inline type hints with a [PEP 561](https://peps.python.org/pep
 | Symbol | Kind | Purpose |
 |---|---|---|
 | `scan_directory(root, *, include=None)` | function | Recursively enumerate files into a DataFrame |
-| `hash_dataframe(df, *, algorithm, workers=None, desc=None)` | function | Hash files referenced by a DataFrame's `file_path` column |
-| `index_directory(root, *, algorithm, include=None, workers=None, desc=None)` | function | Scan + hash in one call |
+| `hash_dataframe(df, *, algorithm="sha256", workers=None, desc=None)` | function | Hash files referenced by a DataFrame's `file_path` column |
+| `index_directory(root, *, algorithm="sha256", include=None, workers=None, desc=None)` | function | Scan + hash in one call |
 | `ALGORITHMS` | tuple[str, ...] | Tuple of supported hash algorithm names |
 | `DEFAULT_ALGORITHM` | str | Default algorithm (`"sha256"`) |
 | `__version__` | str | Installed package version |

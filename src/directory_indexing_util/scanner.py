@@ -40,8 +40,8 @@ def scan_directory(
     -------
     pl.DataFrame
         DataFrame with columns ``file_name`` (``Utf8``) and ``file_path``
-        (``Utf8``).  See :ref:`scan-output-format` in the README for the
-        full schema specification.
+        (``Utf8``).  See the Scan Output Format section in the README for
+        the full schema specification.
 
     Raises
     ------

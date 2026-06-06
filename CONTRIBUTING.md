@@ -44,7 +44,7 @@ uv run ruff format --check
 Reproduce the research benchmarks:
 
 ```bash
-uv sync --group research
+uv sync --extra research
 uv run research/benchmarks/hashing_benchmark.py
 uv run research/benchmarks/scanning_benchmark.py
 ```
