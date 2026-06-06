@@ -24,6 +24,7 @@ from directory_indexing_util.__main__ import (
     _parse_extensions,
     _read_dataframe,
     _resolve_output_path,
+    _write_dataframe,
 )
 
 
@@ -205,3 +206,34 @@ def test_read_dataframe_extension_case_insensitive(tmp_path: Path) -> None:
     src_df.write_parquet(path)
     out = _read_dataframe(path)
     assert out.height == 1
+
+
+# ---------------------------------------------------------------------------
+# CSV formula-injection neutralization (SEC-4)
+# ---------------------------------------------------------------------------
+
+
+def test_write_csv_neutralizes_formula_injection(tmp_path: Path) -> None:
+    """A field beginning with a formula character is written as text in CSV."""
+    df = pl.DataFrame(
+        {
+            "file_name": ["=1+1", "safe.txt"],
+            "file_path": ["C:/data/=1+1", "C:/data/safe.txt"],
+        }
+    )
+    out = tmp_path / "indexed.csv"
+    _write_dataframe(df, out, "csv")
+    text = out.read_text(encoding="utf-8")
+
+    assert "'=1+1" in text  # leading-formula file name is prefixed with a quote
+    assert "C:/data/=1+1" in text  # absolute path has no leading formula char, untouched
+    assert "safe.txt" in text  # benign value is unchanged
+
+
+def test_write_parquet_does_not_alter_values(tmp_path: Path) -> None:
+    """Non-CSV formats are written verbatim, with no formula prefixing."""
+    df = pl.DataFrame({"file_name": ["=1+1"], "file_path": ["C:/data/=1+1"]})
+    out = tmp_path / "indexed.parquet"
+    _write_dataframe(df, out, "parquet")
+    back = _read_dataframe(out)
+    assert back.get_column("file_name")[0] == "=1+1"

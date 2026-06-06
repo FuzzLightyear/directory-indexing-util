@@ -130,6 +130,41 @@ def _resolve_output_path(output: str | None, fmt: str, *, prefix: str = "scan") 
     return target
 
 
+def _sanitize_csv(df: pl.DataFrame) -> pl.DataFrame:
+    """Neutralize spreadsheet formula injection in string columns.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        DataFrame about to be written as CSV.
+
+    Returns
+    -------
+    pl.DataFrame
+        A copy in which every ``Utf8`` cell beginning with ``=``, ``+``,
+        ``-``, ``@``, a tab, or a carriage return is prefixed with a single
+        quote, so a spreadsheet treats it as text rather than a formula.
+
+    Notes
+    -----
+    Only the CSV writer applies this.  Parquet, JSON, and NDJSON are data
+    formats that no spreadsheet evaluates, so they are written verbatim.
+    """
+    import polars as pl  # noqa: PLC0415 - lazy import keeps --help/--version fast
+
+    lead = r"^[=+\-@\t\r]"
+    string_cols = [name for name, dtype in df.schema.items() if dtype == pl.Utf8]
+    if not string_cols:
+        return df
+    return df.with_columns(
+        pl.when(pl.col(name).str.contains(lead))
+        .then(pl.lit("'") + pl.col(name))
+        .otherwise(pl.col(name))
+        .alias(name)
+        for name in string_cols
+    )
+
+
 def _write_dataframe(df: pl.DataFrame, path: Path, fmt: str) -> None:
     """Export a Polars DataFrame in the requested format.
 
@@ -153,7 +188,7 @@ def _write_dataframe(df: pl.DataFrame, path: Path, fmt: str) -> None:
     if fmt == "parquet":
         df.write_parquet(path)
     elif fmt == "csv":
-        df.write_csv(path)
+        _sanitize_csv(df).write_csv(path)
     elif fmt == "json":
         df.write_json(path)
     elif fmt == "ndjson":
