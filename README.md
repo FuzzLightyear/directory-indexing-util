@@ -1,6 +1,6 @@
 # directory-indexing-util
 
-A maximally performant, security-minded utility for recursively walking directory trees, hashing files, and producing a structured index. Collects file hashes, paths, sizes, and metadata into a Polars DataFrame exportable as Parquet, CSV, JSON, or NDJSON.
+A maximally performant, security-minded utility for recursively walking directory trees, hashing files, and producing a structured index. Collects file paths and content hashes into a Polars DataFrame exportable as Parquet, CSV, JSON, or NDJSON.
 
 Designed for two primary use cases:
 1. **Full index** — enumerate files and compute content hashes for deduplication or integrity verification.
