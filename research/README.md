@@ -59,7 +59,7 @@ Strategies are tagged by dependency cost to evaluate the trade-off between perfo
 
 ## Key Findings
 
-**Hashing:** `ThreadPoolExecutor.map` + `hashlib.file_digest` achieves **2 465 MB/s** — 23× faster than multiprocessing. `file_digest` releases the GIL during both I/O and hash computation, making threading effectively lock-free. Progress tracking via `tqdm` adds <3% overhead. All multiprocessing approaches are bottlenecked by process-spawn and serialization costs that dwarf actual hash computation.
+**Hashing:** `ThreadPoolExecutor.map` + `hashlib.file_digest` achieves **2 465 MB/s** — about 22× faster than multiprocessing. `file_digest` releases the GIL during both I/O and hash computation, making threading effectively lock-free. Progress tracking via `tqdm` adds <3% overhead. All multiprocessing approaches are bottlenecked by process-spawn and serialization costs that dwarf actual hash computation.
 
 **Scanning:** Iterative stack-based `os.scandir` is the fastest enumeration method across both flat and deep datasets. `DirEntry.stat()` adds only ~4% overhead on Windows (metadata cached from `FindFirstFile`). Concurrency *hurts* scanning — `ThreadPoolExecutor` is 2.3× slower and `asyncio` is 2.5× slower — because filesystem I/O serializes at the OS level. `pathlib` methods are 3–6× slower due to per-entry `Path` construction and redundant `stat()` syscalls.
 

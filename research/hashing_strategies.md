@@ -58,9 +58,9 @@ Benchmark-driven evaluation of parallelism strategies for file hashing. All resu
 
 ## Analysis
 
-### Threading dominates multiprocessing by 20–35×
+### Threading dominates multiprocessing by 20 to 30×
 
-The most striking result: every threading-based strategy outperforms every multiprocessing-based strategy by at least an order of magnitude. `ThreadPool.map` at 2 465 MB/s is **23× faster** than `mp.Pool(imap_unordered)` at 113 MB/s.
+The most striking result: every threading-based strategy outperforms every multiprocessing-based strategy by at least an order of magnitude. `ThreadPool.map` at 2 465 MB/s is **about 22× faster** than `mp.Pool(imap_unordered)` at 113 MB/s.
 
 This is counterintuitive — Python's GIL should serialize CPU-bound work in threads. The explanation lies in `hashlib.file_digest`'s implementation: it releases the GIL during both the file read (I/O) and the hash computation (C extension). This makes file hashing effectively GIL-free under threading, allowing true parallelism without the process-spawn overhead that multiprocessing pays.
 
