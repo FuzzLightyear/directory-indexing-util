@@ -63,6 +63,8 @@ def _hash_file(path: str, algorithm: str) -> str | None:
     classified with ``os.stat(follow_symlinks=False)`` before opening so a
     crafted input cannot steer hashing at an unintended target.
     """
+    if not isinstance(path, str):
+        return None
     try:
         if _is_non_local_path(path):
             return None
@@ -126,11 +128,13 @@ def hash_dataframe(
     Raises
     ------
     ValueError
-        If ``file_path`` is missing, *algorithm* is unsupported, or
-        *workers* is not a positive integer.
+        If ``file_path`` is missing or not ``Utf8``, *algorithm* is
+        unsupported, or *workers* is not a positive integer.
     """
     if "file_path" not in df.columns:
         raise ValueError("DataFrame must contain a 'file_path' column")
+    if df.get_column("file_path").dtype != pl.Utf8:
+        raise ValueError("'file_path' column must be of type Utf8")
     if algorithm not in hashlib.algorithms_available:
         raise ValueError(f"Unsupported hash algorithm: {algorithm!r}")
     if workers is not None and workers < 1:

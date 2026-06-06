@@ -280,3 +280,22 @@ def test_symlink_path_is_not_followed(tmp_path: Path) -> None:
     df = pl.DataFrame({"file_path": [str(link)]})
     out = hash_dataframe(df)
     assert out.get_column("file_hash")[0] is None
+
+
+# ---------------------------------------------------------------------------
+# Path column dtype validation (SEC-5)
+# ---------------------------------------------------------------------------
+
+
+def test_non_utf8_file_path_column_raises() -> None:
+    """A non-string file_path column is rejected before any open()."""
+    df = pl.DataFrame({"file_path": [1, 2, 3]})
+    with pytest.raises(ValueError, match="Utf8"):
+        hash_dataframe(df)
+
+
+def test_null_file_path_yields_null() -> None:
+    """A null entry in a Utf8 file_path column hashes to None, not a crash."""
+    df = pl.DataFrame({"file_path": [None]}, schema={"file_path": pl.Utf8})
+    out = hash_dataframe(df)
+    assert out.get_column("file_hash")[0] is None
