@@ -299,3 +299,27 @@ def test_null_file_path_yields_null() -> None:
     df = pl.DataFrame({"file_path": [None]}, schema={"file_path": pl.Utf8})
     out = hash_dataframe(df)
     assert out.get_column("file_hash")[0] is None
+
+
+# ---------------------------------------------------------------------------
+# Optional blake3 algorithm
+# ---------------------------------------------------------------------------
+
+
+def test_blake3_matches_reference(tmp_path: Path) -> None:
+    """With blake3 installed, hashing with it matches the blake3 reference digest."""
+    blake3_mod = pytest.importorskip("blake3")
+    content = b"reference-content-for-blake3"
+    (tmp_path / "f.bin").write_bytes(content)
+    df = scan_directory(tmp_path)
+    digest = hash_dataframe(df, algorithm="blake3").get_column("file_hash")[0]
+    assert digest == blake3_mod.blake3(content).hexdigest()
+
+
+def test_blake3_listed_exactly_when_installed() -> None:
+    """ALGORITHMS includes blake3 if and only if the package is importable."""
+    import importlib.util
+
+    from directory_indexing_util import ALGORITHMS
+
+    assert ("blake3" in ALGORITHMS) == (importlib.util.find_spec("blake3") is not None)

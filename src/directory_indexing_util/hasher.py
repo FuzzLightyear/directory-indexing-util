@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import os
 import stat
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
@@ -40,15 +42,37 @@ def _is_non_local_path(path: str) -> bool:
     return path[:2] in ("\\\\", "//")
 
 
-def _hash_file(path: str, algorithm: str) -> str | None:
+def _digest_factory(algorithm: str) -> str | Callable[[], object]:
+    """Return the digest argument for :func:`hashlib.file_digest`.
+
+    Parameters
+    ----------
+    algorithm : str
+        A validated algorithm name.
+
+    Returns
+    -------
+    str or collections.abc.Callable
+        The stdlib algorithm name for built-in algorithms, or the ``blake3``
+        constructor when *algorithm* is ``"blake3"``.
+    """
+    if algorithm == "blake3":
+        from blake3 import blake3  # noqa: PLC0415 - optional dependency, loaded on demand
+
+        return blake3
+    return algorithm
+
+
+def _hash_file(path: str, digest: str | Callable[[], object]) -> str | None:
     """Compute a hex digest of *path*.
 
     Parameters
     ----------
     path : str
         Absolute path to a local regular file.
-    algorithm : str
-        ``hashlib`` algorithm name (e.g., ``"sha256"``).
+    digest : str or collections.abc.Callable
+        The algorithm name or constructor accepted by
+        ``hashlib.file_digest`` (see :func:`_digest_factory`).
 
     Returns
     -------
@@ -71,7 +95,7 @@ def _hash_file(path: str, algorithm: str) -> str | None:
         if not stat.S_ISREG(os.stat(path, follow_symlinks=False).st_mode):
             return None
         with open(path, "rb") as f:  # noqa: S324 - algorithm is caller-validated
-            return hashlib.file_digest(f, algorithm).hexdigest()
+            return hashlib.file_digest(f, digest).hexdigest()
     except (PermissionError, OSError):
         return None
 
@@ -107,7 +131,8 @@ def hash_dataframe(
     df : pl.DataFrame
         Input DataFrame.  Must contain a ``file_path`` column.
     algorithm : str, default ``"sha256"``
-        Any algorithm supported by ``hashlib.file_digest``.
+        Any algorithm supported by ``hashlib.file_digest``, plus ``"blake3"``
+        when the optional blake3 package is installed.
     workers : int or None, default ``None``
         Number of worker threads.  ``None`` selects the auto-tuned
         default ``min(os.cpu_count() * 2, 32)`` from project benchmarks.
@@ -135,16 +160,23 @@ def hash_dataframe(
         raise ValueError("DataFrame must contain a 'file_path' column")
     if df.get_column("file_path").dtype != pl.Utf8:
         raise ValueError("'file_path' column must be of type Utf8")
-    if algorithm not in hashlib.algorithms_available:
+    if algorithm == "blake3":
+        if importlib.util.find_spec("blake3") is None:
+            raise ValueError(
+                "The 'blake3' algorithm requires the optional blake3 package "
+                "(install the 'blake3' extra)."
+            )
+    elif algorithm not in hashlib.algorithms_available:
         raise ValueError(f"Unsupported hash algorithm: {algorithm!r}")
     if workers is not None and workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
 
     paths = df.get_column("file_path").to_list()
     worker_count = workers if workers is not None else _default_workers()
+    digest = _digest_factory(algorithm)
 
     def _hash(p: str) -> str | None:
-        return _hash_file(p, algorithm)
+        return _hash_file(p, digest)
 
     with ThreadPoolExecutor(max_workers=worker_count) as ex:
         iterator = ex.map(_hash, paths)

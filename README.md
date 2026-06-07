@@ -87,7 +87,7 @@ dirindex index /path/to/directory -i jpg,png,heic -a sha512 -o /output/dir
 | `-o`, `--output` | No | Output file path or directory. Directories receive a timestamped filename (`hash_YYYYMMDD_HHMMSS.ext` or `index_YYYYMMDD_HHMMSS.ext`). |
 | `-f`, `--format` | No | Output format: `parquet` (default), `csv`, `json`, `ndjson`. Inferred from extension when `-o` is a file. |
 | `-i`, `--include` *(index only)* | No | Comma-separated extension whitelist, identical semantics to `scan`. |
-| `-a`, `--algorithm` | No | One of `sha256` (default), `sha512`, `blake2b`, `md5`. Per the project benchmarks, SHA-256 via `hashlib.file_digest` hits ~2.4 GB/s on a `ThreadPoolExecutor.map` pool of `min(cpu_count * 2, 32)` workers, fast enough that BLAKE3 (extra dep) is not warranted. |
+| `-a`, `--algorithm` | No | One of `sha256` (default), `sha512`, `blake2b`, `md5`, plus `blake3` when the optional `blake3` extra is installed (`uv sync --extra blake3`). SHA-256 via `hashlib.file_digest` is the default; blake3 hashes faster on a mixed-size benchmark and is offered as an opt-in rather than a required dependency. |
 | `-w`, `--workers` | No | Worker thread count for hashing. Auto-tunes to `min(cpu_count * 2, 32)` when omitted. Lower it under CPU quotas, when running multiple instances concurrently, or on hardware where the default saturates disk I/O. |
 
 ### Hash Output Format

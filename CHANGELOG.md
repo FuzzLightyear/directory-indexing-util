@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional `blake3` hash algorithm, selectable as `-a blake3` on the CLI and `algorithm="blake3"` in the library when the new `blake3` extra is installed (`uv sync --extra blake3`). It hashes faster than SHA-256 on a mixed-size benchmark and stays an opt-in dependency; the default remains SHA-256.
+
 ## [0.1.0] - 2026-05-22
 
 ### Added
