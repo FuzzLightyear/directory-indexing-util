@@ -14,7 +14,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-from directory_indexing_util.config import _config_dir, _profiles_path
+import pytest
+
+from directory_indexing_util.config import (
+    ConfigError,
+    _clean_field,
+    _clean_profile,
+    _config_dir,
+    _normalize_extensions,
+    _profiles_path,
+)
 
 # ---------------------------------------------------------------------------
 # _config_dir
@@ -89,3 +98,112 @@ def test_import_config_stays_stdlib_only() -> None:
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "[]"
+
+
+# ---------------------------------------------------------------------------
+# _normalize_extensions
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_extensions_none_returns_none() -> None:
+    """``None`` normalizes to ``None`` so an unset filter stays unset."""
+    assert _normalize_extensions(None) is None
+
+
+def test_normalize_extensions_parses_comma_string() -> None:
+    """A comma-separated string is split, normalized, and sorted."""
+    assert _normalize_extensions(" .JPG, png ,jpg") == ["jpg", "png"]
+
+
+def test_normalize_extensions_accepts_list() -> None:
+    """A stored list is normalized the same way as a string."""
+    assert _normalize_extensions([".TMP", "log", "tmp"]) == ["log", "tmp"]
+
+
+def test_normalize_extensions_empty_becomes_none() -> None:
+    """Input that yields no usable extensions collapses to ``None``."""
+    assert _normalize_extensions(" , . ,") is None
+
+
+def test_normalize_extensions_rejects_wrong_type() -> None:
+    """A value that is neither string, list, tuple, nor ``None`` is rejected."""
+    with pytest.raises(ConfigError):
+        _normalize_extensions(5)
+
+
+def test_normalize_extensions_rejects_non_string_member() -> None:
+    """A list with a non-string member is rejected rather than coerced."""
+    with pytest.raises(ConfigError):
+        _normalize_extensions(["ok", 7])
+
+
+# ---------------------------------------------------------------------------
+# _clean_field
+# ---------------------------------------------------------------------------
+
+
+def test_clean_field_none_is_dropped() -> None:
+    """A ``None`` value normalizes to ``None`` for any field."""
+    assert _clean_field("algorithm", None) is None
+
+
+def test_clean_field_accepts_known_choices() -> None:
+    """Mode, algorithm, and format pass when within their allowed set."""
+    assert _clean_field("mode", "blacklist") == "blacklist"
+    assert _clean_field("algorithm", "sha256") == "sha256"
+    assert _clean_field("format", "csv") == "csv"
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [("mode", "sideways"), ("algorithm", "rot13"), ("format", "yaml")],
+)
+def test_clean_field_rejects_unknown_choice(key: str, value: str) -> None:
+    """A value outside the allowed set raises with the field named."""
+    with pytest.raises(ConfigError, match=key):
+        _clean_field(key, value)
+
+
+def test_clean_field_workers_requires_positive_int() -> None:
+    """Workers must be an integer of at least one; bools and floats are rejected."""
+    assert _clean_field("workers", 4) == 4
+    for bad in (0, -1, True, "4", 1.5):
+        with pytest.raises(ConfigError):
+            _clean_field("workers", bad)
+
+
+def test_clean_field_output_requires_string() -> None:
+    """Output is kept verbatim when a string, blanked to ``None`` when empty."""
+    assert _clean_field("output", "out.parquet") == "out.parquet"
+    assert _clean_field("output", "") is None
+    with pytest.raises(ConfigError):
+        _clean_field("output", 3)
+
+
+# ---------------------------------------------------------------------------
+# _clean_profile
+# ---------------------------------------------------------------------------
+
+
+def test_clean_profile_drops_unknown_keys() -> None:
+    """Keys outside the profile schema are silently discarded."""
+    cleaned = _clean_profile({"algorithm": "sha512", "rogue": "x"}, strict=True)
+    assert cleaned == {"algorithm": "sha512"}
+
+
+def test_clean_profile_omits_empty_fields() -> None:
+    """Fields that normalize to ``None`` do not appear in the result."""
+    cleaned = _clean_profile({"ext": " , ", "output": ""}, strict=True)
+    assert cleaned == {}
+
+
+def test_clean_profile_strict_raises_on_bad_field() -> None:
+    """In strict mode an invalid known field aborts the whole profile."""
+    with pytest.raises(ConfigError):
+        _clean_profile({"workers": 0}, strict=True)
+
+
+def test_clean_profile_lenient_drops_bad_field() -> None:
+    """In lenient mode a bad field is dropped and the good ones survive."""
+    cleaned = _clean_profile({"workers": 0, "algorithm": "sha256"}, strict=False)
+    assert cleaned == {"algorithm": "sha256"}
