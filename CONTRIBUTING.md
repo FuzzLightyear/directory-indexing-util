@@ -56,7 +56,7 @@ These apply to the maintainer's own commits; they're documented here so the proj
 - **Branch from `main`**, never commit directly. Name branches after the work: `feat/<feature>`, `fix/<issue>`, `docs/<topic>`, `perf/<area>`, `research/<topic>`.
 - **Atomic commits.** Each commit is one logical change with a focused message. Imperative subject (≤ 72 chars), blank line, body explaining the *why* (not the *what*; the diff already shows what).
 - **No comments in code** other than the file-header copyright/SPDX banner; behavioural notes belong in numpydoc-style docstrings (`Notes`, `Parameters`, `Returns`).
-- **Merge strategy:** rebase-and-merge to keep `main` linear while preserving each PR's atomic commits. Squash only when a branch's commits are not individually meaningful. Release tags use semver (`v0.1.0`) and are applied to `main` after the release PR merges.
+- **Merge strategy:** rebase-and-merge to keep `main` linear while preserving each PR's atomic commits. Squash only when a branch's commits are not individually meaningful. Earlier PRs were squash-merged, so most of the pre-v0.2.0 history is one commit per PR on `main`; later PRs preserve their atomic commits. Release tags use semver (`v0.1.0`) and are applied to `main` after the release PR merges.
 
 ## Maintenance status
 
