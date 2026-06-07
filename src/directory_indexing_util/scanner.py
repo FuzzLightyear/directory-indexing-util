@@ -57,6 +57,11 @@ def scan_directory(
     expected.  Their resolved string already terminates with the path
     separator, so the within-root containment check is constructed
     accordingly rather than blindly appending another separator.
+
+    Each visited directory is recorded by its resolved path, so a reparse
+    cycle (such as an NTFS junction pointing back into the tree) is entered
+    once rather than followed endlessly.  An ``OSError`` from an unreadable
+    or malformed directory is skipped rather than propagated.
     """
     root_resolved = Path(root).resolve(strict=True)
     if not root_resolved.is_dir():
@@ -67,6 +72,7 @@ def scan_directory(
     names: list[str] = []
     paths: list[str] = []
     stack: list[Path] = [root_resolved]
+    visited: set[str] = {root_str}
 
     while stack:
         current = stack.pop()
@@ -78,7 +84,9 @@ def scan_directory(
 
                     if entry.is_dir(follow_symlinks=False):
                         resolved = str(Path(entry.path).resolve())
-                        if resolved == root_str or resolved.startswith(root_prefix):
+                        within = resolved == root_str or resolved.startswith(root_prefix)
+                        if within and resolved not in visited:
+                            visited.add(resolved)
                             stack.append(Path(entry.path))
                         continue
 
@@ -102,7 +110,7 @@ def scan_directory(
                     if resolved == root_str or resolved.startswith(root_prefix):
                         names.append(name)
                         paths.append(resolved)
-        except PermissionError:
+        except OSError:
             continue
 
     return pl.DataFrame(

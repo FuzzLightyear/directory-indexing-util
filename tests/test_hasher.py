@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import hashlib
+import sys
 from pathlib import Path
 
 import polars as pl
@@ -245,3 +246,56 @@ def test_file_hash_column_is_utf8(tmp_path: Path) -> None:
     df = scan_directory(tmp_path)
     df = hash_dataframe(df)
     assert df.schema["file_hash"] == pl.Utf8
+
+
+# ---------------------------------------------------------------------------
+# Path safety — untrusted scan files (SEC-2)
+# ---------------------------------------------------------------------------
+
+
+def test_unc_path_is_skipped() -> None:
+    """A UNC path is rejected without being opened, yielding ``None``.
+
+    The check is a pure string test, so no network access occurs.
+    """
+    df = pl.DataFrame({"file_path": [r"\\203.0.113.1\share\secret"]})
+    out = hash_dataframe(df)
+    assert out.get_column("file_hash")[0] is None
+
+
+def test_directory_path_yields_null(tmp_path: Path) -> None:
+    """A path that is a directory, not a regular file, yields ``None``."""
+    df = pl.DataFrame({"file_path": [str(tmp_path)]})
+    out = hash_dataframe(df)
+    assert out.get_column("file_hash")[0] is None
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlink creation requires admin on Windows")
+def test_symlink_path_is_not_followed(tmp_path: Path) -> None:
+    """A symlink in the path column is skipped rather than followed (POSIX)."""
+    target = tmp_path / "target.bin"
+    target.write_bytes(b"x")
+    link = tmp_path / "link.bin"
+    link.symlink_to(target)
+    df = pl.DataFrame({"file_path": [str(link)]})
+    out = hash_dataframe(df)
+    assert out.get_column("file_hash")[0] is None
+
+
+# ---------------------------------------------------------------------------
+# Path column dtype validation (SEC-5)
+# ---------------------------------------------------------------------------
+
+
+def test_non_utf8_file_path_column_raises() -> None:
+    """A non-string file_path column is rejected before any open()."""
+    df = pl.DataFrame({"file_path": [1, 2, 3]})
+    with pytest.raises(ValueError, match="Utf8"):
+        hash_dataframe(df)
+
+
+def test_null_file_path_yields_null() -> None:
+    """A null entry in a Utf8 file_path column hashes to None, not a crash."""
+    df = pl.DataFrame({"file_path": [None]}, schema={"file_path": pl.Utf8})
+    out = hash_dataframe(df)
+    assert out.get_column("file_hash")[0] is None
