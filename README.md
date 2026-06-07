@@ -35,9 +35,10 @@ dirindex scan /path/to/directory -i jpg,png,gif
 | `directory` | Yes | Source directory to scan recursively |
 | `-o`, `--output` | No | Output file path or directory. Directories receive a timestamped filename (`scan_YYYYMMDD_HHMMSS.ext`). Defaults to the current working directory. |
 | `-f`, `--format` | No | Output format: `parquet` (default), `csv`, `json`, `ndjson`. When `-o` specifies a file with a recognized extension, the format is inferred automatically. |
-| `-i`, `--include` | No | Comma-separated whitelist of file extensions to keep (e.g. `jpg,png,gif`). Leading dots and case are normalized. Files with no extension match the empty string `""`. |
+| `-i`, `--include` | No | Comma-separated whitelist of file extensions to keep (e.g. `jpg,png,gif`). Leading dots and case are normalized. Files with no extension match the empty string `""`. Mutually exclusive with `--exclude`. |
+| `-x`, `--exclude` | No | Comma-separated blacklist of file extensions to drop (e.g. `tmp,log`). Same normalization as `--include`, and mutually exclusive with it. |
 
-> **Why whitelist only?** Pre-scan filtering matters most when you have a specific intent ("hash my photos"). The opposite case, "scan everything except a few noise extensions", is cheap to express downstream with a single Polars filter on the resulting index, so a dedicated blacklist flag would add API surface without a meaningful performance win.
+> **Whitelist or blacklist:** use `--include` to keep only certain extensions ("hash my photos") or `--exclude` to drop noise extensions ("skip tmp and log"). The two are mutually exclusive on the command line, since one pass needs a single rule. The library `scan_directory` accepts both `include` and `exclude` if you want to combine them: include is applied first, then exclude.
 
 ### Scan Output Format
 
@@ -86,7 +87,8 @@ dirindex index /path/to/directory -i jpg,png,heic -a sha512 -o /output/dir
 | `input` *(hash)* / `directory` *(index)* | Yes | Scan output file (`hash`) or source directory (`index`) |
 | `-o`, `--output` | No | Output file path or directory. Directories receive a timestamped filename (`hash_YYYYMMDD_HHMMSS.ext` or `index_YYYYMMDD_HHMMSS.ext`). |
 | `-f`, `--format` | No | Output format: `parquet` (default), `csv`, `json`, `ndjson`. Inferred from extension when `-o` is a file. |
-| `-i`, `--include` *(index only)* | No | Comma-separated extension whitelist, identical semantics to `scan`. |
+| `-i`, `--include` *(index only)* | No | Comma-separated extension whitelist, identical semantics to `scan`.  Mutually exclusive with `--exclude`. |
+| `-x`, `--exclude` *(index only)* | No | Comma-separated extension blacklist, identical semantics to `scan`. |
 | `-a`, `--algorithm` | No | One of `sha256` (default), `sha512`, `blake2b`, `md5`, plus `blake3` when the optional `blake3` extra is installed (`uv sync --extra blake3`). SHA-256 via `hashlib.file_digest` is the default; blake3 hashes faster on a mixed-size benchmark and is offered as an opt-in rather than a required dependency. |
 | `-w`, `--workers` | No | Worker thread count for hashing. Auto-tunes to `min(cpu_count * 2, 32)` when omitted. Lower it under CPU quotas, when running multiple instances concurrently, or on hardware where the default saturates disk I/O. |
 
