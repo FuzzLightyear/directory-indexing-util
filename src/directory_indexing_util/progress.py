@@ -80,7 +80,8 @@ class _RichIterator(Generic[T]):
     ) -> None:
         self._iterator = iter(iterable)
         self._total = (
-            total if total is not None
+            total
+            if total is not None
             else (len(iterable) if hasattr(iterable, "__len__") else None)
         )
         self._progress = Progress(
