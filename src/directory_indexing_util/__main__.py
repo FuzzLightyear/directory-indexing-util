@@ -275,22 +275,75 @@ def _write_manifest(
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8", newline="")
 
 
+def _require_directory(value: str) -> Path:
+    """Return *value* as an existing directory, or exit with an error.
+
+    Parameters
+    ----------
+    value : str
+        User-supplied path expected to be an existing directory.
+
+    Returns
+    -------
+    Path
+        The path, confirmed to exist and to be a directory.
+
+    Raises
+    ------
+    SystemExit
+        With code 1 if the path is missing or is not a directory.
+    """
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    path = Path(value)
+    if not path.exists():
+        logger.error("Directory does not exist: {}", path)
+        raise SystemExit(1)
+    if not path.is_dir():
+        logger.error("Not a directory: {}", path)
+        raise SystemExit(1)
+    return path
+
+
+def _require_file(value: str) -> Path:
+    """Return *value* as an existing file, or exit with an error.
+
+    Parameters
+    ----------
+    value : str
+        User-supplied path expected to be an existing regular file.
+
+    Returns
+    -------
+    Path
+        The path, confirmed to exist and to be a file.
+
+    Raises
+    ------
+    SystemExit
+        With code 1 if the path is missing or is not a file.
+    """
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    path = Path(value)
+    if not path.exists():
+        logger.error("Input file does not exist: {}", path)
+        raise SystemExit(1)
+    if not path.is_file():
+        logger.error("Not a file: {}", path)
+        raise SystemExit(1)
+    return path
+
+
 def _cmd_scan(args: argparse.Namespace) -> None:
     """Execute the ``scan`` subcommand."""
-    from loguru import logger  # noqa: PLC0415 - lazy
     from rich.console import Console  # noqa: PLC0415 - lazy
 
     from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
 
     console = Console()
 
-    root = Path(args.directory)
-    if not root.exists():
-        logger.error("Directory does not exist: {}", root)
-        raise SystemExit(1)
-    if not root.is_dir():
-        logger.error("Not a directory: {}", root)
-        raise SystemExit(1)
+    root = _require_directory(args.directory)
 
     fmt = _infer_format(args)
 
@@ -315,13 +368,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
 
     console = Console()
 
-    input_path = Path(args.input)
-    if not input_path.exists():
-        logger.error("Input file does not exist: {}", input_path)
-        raise SystemExit(1)
-    if not input_path.is_file():
-        logger.error("Not a file: {}", input_path)
-        raise SystemExit(1)
+    input_path = _require_file(args.input)
 
     fmt = _infer_format(args)
 
@@ -358,7 +405,6 @@ def _cmd_hash(args: argparse.Namespace) -> None:
 
 def _cmd_index(args: argparse.Namespace) -> None:
     """Execute the ``index`` subcommand — scan + hash in a single pass."""
-    from loguru import logger  # noqa: PLC0415 - lazy
     from rich.console import Console  # noqa: PLC0415 - lazy
 
     from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
@@ -366,13 +412,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
 
     console = Console()
 
-    root = Path(args.directory)
-    if not root.exists():
-        logger.error("Directory does not exist: {}", root)
-        raise SystemExit(1)
-    if not root.is_dir():
-        logger.error("Not a directory: {}", root)
-        raise SystemExit(1)
+    root = _require_directory(args.directory)
 
     fmt = _infer_format(args)
 
