@@ -6,15 +6,15 @@
 Compares concurrency strategies for file hashing using a single hash
 function (``hashlib.file_digest`` with SHA-256) to isolate the
 parallelism variable. Every strategy calls the same ``hash_file``
-implementation — the only difference is the dispatch mechanism.
+implementation; the only difference is the dispatch mechanism.
 
 Strategies are tagged by dependency tier to evaluate the trade-off
 between performance and install footprint:
 
-- **T0** — stdlib only (``hashlib``, ``concurrent.futures``, ``os``).
+- **T0**: stdlib only (``hashlib``, ``concurrent.futures``, ``os``).
   Fully ``mypyc``-compilable.
-- **T2** — adds ``tqdm`` for progress tracking.
-- **T3** — adds ``joblib`` for convenience parallelism.
+- **T2**: adds ``tqdm`` for progress tracking.
+- **T3**: adds ``joblib`` for convenience parallelism.
 
 Security
 --------
@@ -39,20 +39,22 @@ Examples
 --------
 .. code-block:: bash
 
-    uv run --group research research/benchmarks/hashing_benchmark.py
-    uv run --group research research/benchmarks/hashing_benchmark.py /path/to/files
+    uv run --extra research research/benchmarks/hashing_benchmark.py
+    uv run --extra research research/benchmarks/hashing_benchmark.py /path/to/files
 """
 
 from __future__ import annotations
 
 import contextlib
 import hashlib
+import importlib.util
 import io
 import os
 import stat
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from functools import partial
 from multiprocessing import Pool, cpu_count, freeze_support
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -164,7 +166,7 @@ def _sequential(files: list[str], *, progress: bool) -> pl.DataFrame:
 
 
 def _threadpool_map(files: list[str], *, progress: bool) -> pl.DataFrame:
-    """``ThreadPoolExecutor.map`` — preserves input order, minimal overhead."""
+    """``ThreadPoolExecutor.map``, preserves input order, minimal overhead."""
     n = min(cpu_count() * 2, 32)
     with ThreadPoolExecutor(max_workers=n) as ex:
         if progress and HAS_TQDM:
@@ -216,7 +218,7 @@ def _mp_pool_imap(files: list[str], *, progress: bool) -> pl.DataFrame:
 
 
 def _tqdm_thread_map(files: list[str], *, progress: bool) -> pl.DataFrame:
-    """``tqdm.contrib.concurrent.thread_map`` — one-liner threaded parallel."""
+    """``tqdm.contrib.concurrent.thread_map``, one-liner threaded parallel."""
     hashes = list(
         thread_map(
             hash_file,
@@ -230,7 +232,7 @@ def _tqdm_thread_map(files: list[str], *, progress: bool) -> pl.DataFrame:
 
 
 def _tqdm_process_map(files: list[str], *, progress: bool) -> pl.DataFrame:
-    """``tqdm.contrib.concurrent.process_map`` — one-liner process parallel."""
+    """``tqdm.contrib.concurrent.process_map``, one-liner process parallel."""
     hashes = list(
         process_map(
             hash_file,
@@ -252,9 +254,7 @@ def _joblib_threading(files: list[str], *, progress: bool) -> pl.DataFrame:
                 delayed(hash_file)(fp) for fp in files
             )
     else:
-        hashes = Parallel(n_jobs=-1, backend="threading")(
-            delayed(hash_file)(fp) for fp in files
-        )
+        hashes = Parallel(n_jobs=-1, backend="threading")(delayed(hash_file)(fp) for fp in files)
     return pl.DataFrame({"path": files, "hash": hashes})
 
 
@@ -292,9 +292,7 @@ if HAS_JOBLIB:
     ]
 
 
-def run_single(
-    fn: Callable, files: list[str], *, progress: bool
-) -> tuple[float, int]:
+def run_single(fn: Callable, files: list[str], *, progress: bool) -> tuple[float, int]:
     """Execute a single strategy and return elapsed time and valid hash count.
 
     Parameters
@@ -331,11 +329,12 @@ def warmup(strategies: list[tuple[str, Callable, str]], files: list[str]) -> Non
     """
     subset = files[:5]
     for _, fn, _ in strategies:
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            try:
-                fn(subset, progress=False)
-            except Exception:
-                pass
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+            contextlib.suppress(Exception),
+        ):
+            fn(subset, progress=False)
 
 
 def run_all(target_dir: Path) -> pl.DataFrame:
@@ -358,7 +357,7 @@ def run_all(target_dir: Path) -> pl.DataFrame:
     total_mb = total_bytes / 1_000_000
 
     print("=" * 80)
-    print("  HASHING BENCHMARK — hashlib.file_digest SHA-256")
+    print("  HASHING BENCHMARK: hashlib.file_digest SHA-256")
     print("=" * 80)
     print(f"  Target:  {target_dir}")
     print(f"  Files:   {len(files)}")
@@ -384,15 +383,17 @@ def run_all(target_dir: Path) -> pl.DataFrame:
             elapsed, valid = run_single(fn, files, progress=with_progress)
             tp = total_mb / elapsed if elapsed > 0 else 0
             print(f"{elapsed:.4f}s   {tp:>7.0f} MB/s   [{valid}/{len(files)}]")
-            rows.append({
-                "strategy": name,
-                "dep_tier": tier,
-                "progress": with_progress,
-                "elapsed_s": round(elapsed, 4),
-                "throughput_mb_s": round(tp, 1),
-                "files_hashed": valid,
-                "total_files": len(files),
-            })
+            rows.append(
+                {
+                    "strategy": name,
+                    "dep_tier": tier,
+                    "progress": with_progress,
+                    "elapsed_s": round(elapsed, 4),
+                    "throughput_mb_s": round(tp, 1),
+                    "files_hashed": valid,
+                    "total_files": len(files),
+                }
+            )
 
     return pl.DataFrame(rows)
 
@@ -421,7 +422,7 @@ def print_results(df: pl.DataFrame) -> None:
         ranked = df.filter(filt).sort("elapsed_s")
         print()
         print("=" * 80)
-        print(f"  RANKING — {label}")
+        print(f"  RANKING: {label}")
         print("=" * 80)
         print(f"  {'#':<3} {'Strategy':<28} {'Tier':<5} {'Time':>9} {'MB/s':>10}")
         print(f"  {'-' * 3} {'-' * 28} {'-' * 5} {'-' * 9} {'-' * 10}")
@@ -434,7 +435,7 @@ def print_results(df: pl.DataFrame) -> None:
     t0 = df.filter(pl.col("dep_tier") == "T0")
     print()
     print("=" * 80)
-    print("  BEST STDLIB-ONLY (T0) — zero ext deps, mypyc-compilable")
+    print("  BEST STDLIB-ONLY (T0): zero ext deps, mypyc-compilable")
     print("=" * 80)
     for label, filt in [
         ("no progress", ~pl.col("progress")),
@@ -473,8 +474,161 @@ def print_results(df: pl.DataFrame) -> None:
         )
 
 
+def _hash_file_with(file_path: str, digest: str | Callable[[], object]) -> str | None:
+    """Hash a single file with an arbitrary ``hashlib.file_digest`` digest.
+
+    Parameters
+    ----------
+    file_path : str
+        Absolute path to the file.
+    digest : str or collections.abc.Callable
+        Algorithm name or constructor passed to ``hashlib.file_digest``.
+
+    Returns
+    -------
+    str or None
+        Hex digest, or ``None`` if the file cannot be read.
+    """
+    try:
+        with open(file_path, "rb") as f:
+            return hashlib.file_digest(f, digest).hexdigest()
+    except (PermissionError, OSError):
+        return None
+
+
+def _digest_arg(algorithm: str) -> str | Callable[[], object]:
+    """Return the ``hashlib.file_digest`` argument for *algorithm*.
+
+    Parameters
+    ----------
+    algorithm : str
+        Algorithm name.  ``"blake3"`` resolves to the blake3 constructor.
+
+    Returns
+    -------
+    str or collections.abc.Callable
+        The stdlib algorithm name, or the blake3 constructor.
+    """
+    if algorithm == "blake3":
+        from blake3 import blake3
+
+        return blake3
+    return algorithm
+
+
+def _time_pool(
+    files: list[str], workers: int, digest: str | Callable[[], object] = "sha256"
+) -> float:
+    """Time one ``ThreadPoolExecutor.map`` hashing pass.
+
+    Parameters
+    ----------
+    files : list of str
+        File paths to hash.
+    workers : int
+        Thread-pool size.
+    digest : str or collections.abc.Callable, default ``"sha256"``
+        Digest passed to ``hashlib.file_digest``.
+
+    Returns
+    -------
+    float
+        Wall-clock seconds for the pass.
+    """
+    fn = partial(_hash_file_with, digest=digest)
+    start = time.perf_counter()
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        list(ex.map(fn, files))
+    return time.perf_counter() - start
+
+
+def run_worker_sweep(target_dir: Path, *, reps: int = 3) -> pl.DataFrame:
+    """Sweep ``ThreadPoolExecutor.map`` worker counts for SHA-256.
+
+    Validates the library default of ``min(cpu_count() * 2, 32)`` by timing
+    a range of worker counts on the same file set.
+
+    Parameters
+    ----------
+    target_dir : Path
+        Root directory of files to hash.
+    reps : int, default 3
+        Timed repetitions per worker count; the best time is kept.
+
+    Returns
+    -------
+    pl.DataFrame
+        Columns ``workers``, ``elapsed_s``, ``throughput_mb_s``.
+    """
+    files = enumerate_files(target_dir)
+    total_mb = sum(os.path.getsize(f) for f in files) / 1_000_000
+    cpu = cpu_count()
+    counts = sorted({cpu, int(cpu * 1.5), cpu * 2, cpu * 3, min(cpu * 2, 32)})
+    rows: list[dict] = []
+    for n in counts:
+        best = min(_time_pool(files, n) for _ in range(reps))
+        tp = total_mb / best if best > 0 else 0
+        rows.append({"workers": n, "elapsed_s": round(best, 4), "throughput_mb_s": round(tp, 1)})
+    return pl.DataFrame(rows)
+
+
+def run_algorithm_sweep(target_dir: Path, *, reps: int = 3) -> pl.DataFrame:
+    """Compare hash algorithms at the default worker count.
+
+    Includes ``blake3`` when the optional package is installed.
+
+    Parameters
+    ----------
+    target_dir : Path
+        Root directory of files to hash.
+    reps : int, default 3
+        Timed repetitions per algorithm; the best time is kept.
+
+    Returns
+    -------
+    pl.DataFrame
+        Columns ``algorithm``, ``elapsed_s``, ``throughput_mb_s``.
+    """
+    files = enumerate_files(target_dir)
+    total_mb = sum(os.path.getsize(f) for f in files) / 1_000_000
+    n = min(cpu_count() * 2, 32)
+    algorithms = ["sha256", "sha512", "blake2b"]
+    if importlib.util.find_spec("blake3") is not None:
+        algorithms.append("blake3")
+    rows: list[dict] = []
+    for algo in algorithms:
+        best = min(_time_pool(files, n, _digest_arg(algo)) for _ in range(reps))
+        tp = total_mb / best if best > 0 else 0
+        rows.append(
+            {"algorithm": algo, "elapsed_s": round(best, 4), "throughput_mb_s": round(tp, 1)}
+        )
+    return pl.DataFrame(rows)
+
+
+def print_sweep(df: pl.DataFrame, title: str, key: str) -> None:
+    """Print a two-column sweep leaderboard sorted fastest first.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Sweep results with *key*, ``elapsed_s``, and ``throughput_mb_s``.
+    title : str
+        Section heading.
+    key : str
+        Name of the varied column (``"workers"`` or ``"algorithm"``).
+    """
+    print()
+    print("=" * 80)
+    print(f"  {title}")
+    print("=" * 80)
+    print(f"  {key:<12} {'Time':>10} {'MB/s':>10}")
+    print(f"  {'-' * 12} {'-' * 10} {'-' * 10}")
+    for row in df.sort("elapsed_s").iter_rows(named=True):
+        print(f"  {str(row[key]):<12} {row['elapsed_s']:>9.4f}s {row['throughput_mb_s']:>9.1f}")
+
+
 def main():
-    """Entry point — parse arguments, run benchmark, save results."""
+    """Entry point: parse arguments, run benchmark, save results."""
     if len(sys.argv) > 1:
         target = Path(sys.argv[1])
         if not target.is_dir():
@@ -483,7 +637,7 @@ def main():
     else:
         from generate_test_data import DEFAULT_OUTPUT_DIR, generate_flat
 
-        print("No directory given — generating synthetic test data...")
+        print("No directory given; generating synthetic test data...")
         n = generate_flat()
         print(f"Generated {n} files in {DEFAULT_OUTPUT_DIR}\n")
         target = DEFAULT_OUTPUT_DIR
@@ -491,8 +645,15 @@ def main():
     df = run_all(target)
     print_results(df)
 
+    worker_df = run_worker_sweep(target)
+    print_sweep(worker_df, "WORKER-COUNT SWEEP: ThreadPool.map SHA-256", "workers")
+    algo_df = run_algorithm_sweep(target)
+    print_sweep(algo_df, "ALGORITHM SWEEP: ThreadPool.map at the default worker count", "algorithm")
+
     out_path = Path(__file__).parent / "hashing_results.parquet"
     df.write_parquet(out_path)
+    worker_df.write_parquet(Path(__file__).parent / "worker_sweep_results.parquet")
+    algo_df.write_parquet(Path(__file__).parent / "algorithm_sweep_results.parquet")
     print(f"\nResults saved to {out_path}")
 
 
