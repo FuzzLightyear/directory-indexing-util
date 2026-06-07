@@ -52,8 +52,8 @@ def scan_directory(
 
     Notes
     -----
-    Filesystem roots — POSIX ``/`` and Windows drive roots such as
-    ``C:\\`` — are valid inputs and enumerate files beneath the root as
+    Filesystem roots (POSIX ``/`` and Windows drive roots such as
+    ``C:\\``) are valid inputs and enumerate files beneath the root as
     expected.  Their resolved string already terminates with the path
     separator, so the within-root containment check is constructed
     accordingly rather than blindly appending another separator.

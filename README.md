@@ -1,12 +1,12 @@
 # directory-indexing-util
 
-A maximally performant, security-minded utility for recursively walking directory trees, hashing files, and producing a structured index. Collects file paths and content hashes into a Polars DataFrame exportable as Parquet, CSV, JSON, or NDJSON.
+A performant, security-minded utility for recursively walking directory trees, hashing files, and producing a structured index. Collects file paths and content hashes into a Polars DataFrame exportable as Parquet, CSV, JSON, or NDJSON.
 
 Designed for two primary use cases:
-1. **Full index** — enumerate files and compute content hashes for deduplication or integrity verification.
-2. **Collection only** — enumerate files and metadata without hashing.
+1. **Full index**: enumerate files and compute content hashes for deduplication or integrity verification.
+2. **Collection only**: enumerate files and metadata without hashing.
 
-> **Maintenance status:** Personal project, casually maintained. **Issues are welcome** for bugs and feature requests. **External pull requests are not accepted** — fork freely under MIT for your own changes. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+> **Maintenance status:** Personal project, casually maintained. **Issues are welcome** for bugs and feature requests. **External pull requests are not accepted**.  Fork freely under MIT for your own changes. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Usage
 
@@ -37,7 +37,7 @@ dirindex scan /path/to/directory -i jpg,png,gif
 | `-f`, `--format` | No | Output format: `parquet` (default), `csv`, `json`, `ndjson`. When `-o` specifies a file with a recognized extension, the format is inferred automatically. |
 | `-i`, `--include` | No | Comma-separated whitelist of file extensions to keep (e.g. `jpg,png,gif`). Leading dots and case are normalized. Files with no extension match the empty string `""`. |
 
-> **Why whitelist only?** Pre-scan filtering matters most when you have a specific intent ("hash my photos"). The opposite case — "scan everything except a few noise extensions" — is cheap to express downstream with a single Polars filter on the resulting index, so a dedicated blacklist flag would add API surface without a meaningful performance win.
+> **Why whitelist only?** Pre-scan filtering matters most when you have a specific intent ("hash my photos"). The opposite case, "scan everything except a few noise extensions", is cheap to express downstream with a single Polars filter on the resulting index, so a dedicated blacklist flag would add API surface without a meaningful performance win.
 
 ### Scan Output Format
 
@@ -53,7 +53,7 @@ The scan produces a two-column DataFrame that serves as the canonical input for 
 - Every resolved path is validated to remain within the scan root, preventing directory-junction escapes
 - Inaccessible directories are silently skipped (no `PermissionError` propagation)
 
-**Design rationale:** Parquet is the default output format because it preserves column types, compresses well, and is the fastest format for Polars to read back — critical when the scan output feeds into the hashing pipeline.
+**Design rationale:** Parquet is the default output format because it preserves column types, compresses well, and is the fastest format for Polars to read back, which is critical when the scan output feeds into the hashing pipeline.
 
 ### Hashing
 
@@ -69,7 +69,7 @@ dirindex hash scan_20260521.parquet -a blake2b -o hashed.parquet
 
 ### Combined workflow (`index`)
 
-Run scan + hash in a single process — no intermediate file, single command:
+Run scan + hash in a single process, with no intermediate file and a single command:
 
 ```bash
 # One-shot index of a directory
@@ -87,7 +87,7 @@ dirindex index /path/to/directory -i jpg,png,heic -a sha512 -o /output/dir
 | `-o`, `--output` | No | Output file path or directory. Directories receive a timestamped filename (`hash_YYYYMMDD_HHMMSS.ext` or `index_YYYYMMDD_HHMMSS.ext`). |
 | `-f`, `--format` | No | Output format: `parquet` (default), `csv`, `json`, `ndjson`. Inferred from extension when `-o` is a file. |
 | `-i`, `--include` *(index only)* | No | Comma-separated extension whitelist, identical semantics to `scan`. |
-| `-a`, `--algorithm` | No | One of `sha256` (default), `sha512`, `blake2b`, `md5`. Per the project benchmarks, SHA-256 via `hashlib.file_digest` hits ~2.4 GB/s on a `ThreadPoolExecutor.map` pool of `min(cpu_count * 2, 32)` workers — fast enough that BLAKE3 (extra dep) is not warranted. |
+| `-a`, `--algorithm` | No | One of `sha256` (default), `sha512`, `blake2b`, `md5`. Per the project benchmarks, SHA-256 via `hashlib.file_digest` hits ~2.4 GB/s on a `ThreadPoolExecutor.map` pool of `min(cpu_count * 2, 32)` workers, fast enough that BLAKE3 (extra dep) is not warranted. |
 | `-w`, `--workers` | No | Worker thread count for hashing. Auto-tunes to `min(cpu_count * 2, 32)` when omitted. Lower it under CPU quotas, when running multiple instances concurrently, or on hardware where the default saturates disk I/O. |
 
 ### Hash Output Format
@@ -119,7 +119,7 @@ Every `hash` or `index` invocation also writes a JSON manifest beside the data f
 | Field | Purpose |
 |---|---|
 | `command` | Subcommand that produced the output (`"hash"` or `"index"`). |
-| `input_path` | Absolute path of the input — scan file for `hash`, source directory for `index`. |
+| `input_path` | Absolute path of the input: scan file for `hash`, source directory for `index`. |
 | `output_path` | Data file written alongside this manifest. |
 | `hash_algorithm` | Algorithm used (`sha256`, `sha512`, `blake2b`, `md5`). |
 | `file_count` | Total rows in the produced index. |
@@ -141,7 +141,7 @@ dirindex index /some/directory
 # Without explicit install, uv resolves the entry point on demand
 uv run dirindex index /some/directory
 
-# Inspect the installed version (instant — no heavy imports)
+# Inspect the installed version (instant, no heavy imports)
 dirindex --version
 ```
 
@@ -158,10 +158,10 @@ from directory_indexing_util import (
     DEFAULT_ALGORITHM,
 )
 
-# Scan only — returns a Polars DataFrame with file_name and file_path columns
+# Scan only: returns a Polars DataFrame with file_name and file_path columns
 df = scan_directory("/path/to/dir", include={"jpg", "png"})
 
-# Hash an existing scan result — adds a file_hash column
+# Hash an existing scan result: adds a file_hash column
 df = hash_dataframe(df, algorithm="sha256")
 
 # One-shot: scan + hash in a single call
@@ -194,15 +194,15 @@ Anything not in this list (internal modules, CLI helpers, the `progress` utiliti
 
 ## Platform Support
 
-Tested on Windows 11 and Linux. The implementation uses only cross-platform stdlib APIs (`os.scandir`, `hashlib.file_digest`, `concurrent.futures`) plus Polars, Rich, and Loguru — all of which support both platforms natively.
+Tested on Windows 11 and Linux. The implementation uses only cross-platform stdlib APIs (`os.scandir`, `hashlib.file_digest`, `concurrent.futures`) plus Polars, Rich, and Loguru, all of which support both platforms natively.
 
 Notable cross-platform considerations the package already handles:
 
-- **Path separators** — `os.sep` is used for prefix construction; both Windows backslash and POSIX forward slash work transparently.
-- **Filesystem roots** — POSIX `/` and Windows drive roots (`C:\`) are valid scan inputs.
-- **Symlinks and Windows junctions** — both are skipped before traversal; the resolved-path containment check is the second-line defense against junction escapes.
-- **Case sensitivity** — `Path.resolve()` canonicalizes to filesystem case, so the within-root containment check works consistently on case-insensitive (Windows) and case-sensitive (Linux) filesystems.
-- **Unicode in paths** — manifest JSON is written as UTF-8 with LF line endings on every platform, so non-ASCII filenames round-trip safely and the file is byte-identical regardless of the producing OS.
+- **Path separators**: `os.sep` is used for prefix construction; both Windows backslash and POSIX forward slash work transparently.
+- **Filesystem roots**: POSIX `/` and Windows drive roots (`C:\`) are valid scan inputs.
+- **Symlinks and Windows junctions**: both are skipped before traversal; the resolved-path containment check is the second-line defense against junction escapes.
+- **Case sensitivity**: `Path.resolve()` canonicalizes to filesystem case, so the within-root containment check works consistently on case-insensitive (Windows) and case-sensitive (Linux) filesystems.
+- **Unicode in paths**: manifest JSON is written as UTF-8 with LF line endings on every platform, so non-ASCII filenames round-trip safely and the file is byte-identical regardless of the producing OS.
 
 ## Infrastructure
 

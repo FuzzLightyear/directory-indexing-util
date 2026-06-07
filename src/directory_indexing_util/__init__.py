@@ -105,7 +105,7 @@ def index_directory(
     algorithm : str, default ``"sha256"``
         Hash algorithm.  See :data:`ALGORITHMS` for accepted values.
     include : set of str, optional
-        Extension whitelist applied during scanning — see
+        Extension whitelist applied during scanning.  See
         :func:`scan_directory` for semantics.
     workers : int or None, default ``None``
         Number of worker threads for the hashing phase.  ``None`` uses

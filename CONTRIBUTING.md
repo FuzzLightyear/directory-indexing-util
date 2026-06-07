@@ -6,8 +6,8 @@ This is a personal project, maintained casually. **External pull requests are no
 
 The "New Issue" page offers two templates:
 
-- **Bug report** — for incorrect or surprising behaviour.
-- **Feature request** — for missing capabilities or API gaps.
+- **Bug report**: for incorrect or surprising behaviour.
+- **Feature request**: for missing capabilities or API gaps.
 
 A good issue includes enough information for a single-pass fix: minimal reproduction, expected vs. actual output, environment details. The templates prompt for these.
 
@@ -54,7 +54,7 @@ uv run research/benchmarks/scanning_benchmark.py
 These apply to the maintainer's own commits; they're documented here so the project's history stays legible.
 
 - **Branch from `main`**, never commit directly. Name branches after the work: `feat/<feature>`, `fix/<issue>`, `docs/<topic>`, `perf/<area>`, `research/<topic>`.
-- **Atomic commits.** Each commit is one logical change with a focused message. Imperative subject (≤ 72 chars), blank line, body explaining the *why* (not the *what* — the diff already shows what).
+- **Atomic commits.** Each commit is one logical change with a focused message. Imperative subject (≤ 72 chars), blank line, body explaining the *why* (not the *what*; the diff already shows what).
 - **No comments in code** other than the file-header copyright/SPDX banner; behavioural notes belong in numpydoc-style docstrings (`Notes`, `Parameters`, `Returns`).
 - **Merge strategy:** squash-merge to keep `main` linear. For substantive phase milestones, the tip of the feature branch is tagged with an annotated tag *before* the squash so the granular development history stays reachable. Tag names are short, descriptive, and unversioned; release tags use semver (`v0.1.0`).
 

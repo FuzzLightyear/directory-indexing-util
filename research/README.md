@@ -4,7 +4,7 @@ This directory contains reproducible benchmarks and analysis that informed every
 
 ## Motivation
 
-File hashing and directory scanning are deceptively complex performance problems. The optimal strategy depends on the interplay between I/O patterns, OS syscall overhead, the GIL, process-spawn cost, and hash algorithm internals. Rather than guessing, we measured.
+File hashing and directory scanning have non-obvious performance characteristics. The optimal strategy depends on the interplay between I/O patterns, OS syscall overhead, the GIL, process-spawn cost, and hash algorithm internals, so we benchmarked rather than assumed.
 
 ## Benchmarks
 
@@ -59,16 +59,16 @@ Strategies are tagged by dependency cost to evaluate the trade-off between perfo
 
 ## Key Findings
 
-**Hashing:** `ThreadPoolExecutor.map` + `hashlib.file_digest` achieves **2 465 MB/s** — about 22× faster than multiprocessing. `file_digest` releases the GIL during both I/O and hash computation, making threading effectively lock-free. Progress tracking via `tqdm` adds <3% overhead. All multiprocessing approaches are bottlenecked by process-spawn and serialization costs that dwarf actual hash computation.
+**Hashing:** `ThreadPoolExecutor.map` + `hashlib.file_digest` achieves **2 465 MB/s**, about 22× faster than multiprocessing. `file_digest` releases the GIL during both I/O and hash computation, making threading effectively lock-free. Progress tracking via `tqdm` adds <3% overhead. All multiprocessing approaches are bottlenecked by process-spawn and serialization costs that dwarf actual hash computation.
 
-**Scanning:** Iterative stack-based `os.scandir` is the fastest enumeration method across both flat and deep datasets. `DirEntry.stat()` adds only ~4% overhead on Windows (metadata cached from `FindFirstFile`). Concurrency *hurts* scanning — `ThreadPoolExecutor` is 2.3× slower and `asyncio` is 2.5× slower — because filesystem I/O serializes at the OS level. `pathlib` methods are 3–6× slower due to per-entry `Path` construction and redundant `stat()` syscalls.
+**Scanning:** Iterative stack-based `os.scandir` is the fastest enumeration method across both flat and deep datasets. `DirEntry.stat()` adds only ~4% overhead on Windows (metadata cached from `FindFirstFile`). Concurrency *hurts* scanning (`ThreadPoolExecutor` is 2.3× slower and `asyncio` is 2.5× slower) because filesystem I/O serializes at the OS level. `pathlib` methods are 3 to 6× slower due to per-entry `Path` construction and redundant `stat()` syscalls.
 
 **Dependency strategy:** The optimal approaches for both hashing and scanning are **T0 (stdlib-only)**, requiring zero external dependencies and remaining fully `mypyc`-compilable.
 
 ## Detailed Analysis
 
-- [`hashing_strategies.md`](hashing_strategies.md) — Full analysis of parallelism for file hashing
-- [`scanning_strategies.md`](scanning_strategies.md) — Full analysis of directory enumeration methods
+- [`hashing_strategies.md`](hashing_strategies.md): Full analysis of parallelism for file hashing
+- [`scanning_strategies.md`](scanning_strategies.md): Full analysis of directory enumeration methods
 
 ## Running the Benchmarks
 
