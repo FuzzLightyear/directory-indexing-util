@@ -11,7 +11,7 @@ Benchmark-driven evaluation of directory-enumeration methods. All strategies sca
 | CPUs | 8 logical cores |
 | Platform | Windows 11 / Python 3.12 |
 
-## Results — Flat Dataset (370 files, 4 dirs)
+## Results: Flat Dataset (370 files, 4 dirs)
 
 | # | Strategy | Best (s) | Median (s) | vs #1 |
 |---|----------|----------|------------|-------|
@@ -27,7 +27,7 @@ Benchmark-driven evaluation of directory-enumeration methods. All strategies sca
 | 10 | `ThreadPool+scandir` | 0.00800 | 0.00850 | 22.86× |
 | 11 | `asyncio+scandir` | 0.00870 | 0.00900 | 24.86× |
 
-## Results — Deep Dataset (5 864 files, ~730 dirs)
+## Results: Deep Dataset (5 864 files, ~730 dirs)
 
 | # | Strategy | Best (s) | Median (s) | vs #1 |
 |---|----------|----------|------------|-------|
@@ -45,33 +45,33 @@ Benchmark-driven evaluation of directory-enumeration methods. All strategies sca
 
 ## Analysis
 
-### `os.scandir` is 1.2–1.7× faster than `os.walk`
+### `os.scandir` is 1.2 to 1.7× faster than `os.walk`
 
 All four `scandir` variants outperform `os.walk`. The difference is structural: `os.walk` internally calls `os.scandir` but then creates sorted filename lists for each directory, discarding the `DirEntry` objects. Direct `scandir` usage avoids this intermediate allocation and preserves access to cached metadata.
 
-Among scandir variants, the stack-based approach edges out the recursive generators by a small margin on the flat dataset, while the generators are within 1–3% on the deep dataset. The practical difference is negligible — choose based on code clarity.
+Among scandir variants, the stack-based approach edges out the recursive generators by a small margin on the flat dataset, while the generators are within 1 to 3% on the deep dataset. The practical difference is negligible, so choose based on code clarity.
 
-### `pathlib` is 3–6× slower than `os.scandir`
+### `pathlib` is 3 to 6× slower than `os.scandir`
 
 Every `pathlib` strategy (`rglob`, `glob+rglob` hybrid, recursive `iterdir`) is significantly slower than the `os.scandir` and `os.walk` approaches. The root cause: `pathlib` wraps every directory entry in a `Path` object and performs a separate `stat()` system call for each `is_file()` / `is_dir()` check.
 
-`os.scandir`'s `DirEntry` objects expose `is_file()` and `is_dir()` without additional syscalls — on Windows, this metadata is cached from `FindFirstFile`/`FindNextFile`; on Linux, it comes from `d_type` in the directory entry (with a `stat()` fallback for filesystems that don't populate `d_type`).
+`os.scandir`'s `DirEntry` objects expose `is_file()` and `is_dir()` without additional syscalls.  On Windows, this metadata is cached from `FindFirstFile`/`FindNextFile`; on Linux, it comes from `d_type` in the directory entry (with a `stat()` fallback for filesystems that don't populate `d_type`).
 
 ### `DirEntry.stat()` is nearly free on Windows
 
-The `scandir stack +stat` variant collects `st_size` and `st_mtime` in addition to file paths, adding only ~4% overhead on the flat dataset and ~4% on the deep dataset. On Windows, `DirEntry.stat(follow_symlinks=False)` returns cached attributes from the initial `FindFirstFile` call — no additional syscall is needed. This means metadata collection can be included in the scanning pass without a meaningful performance penalty.
+The `scandir stack +stat` variant collects `st_size` and `st_mtime` in addition to file paths, adding only ~4% overhead on the flat dataset and ~4% on the deep dataset. On Windows, `DirEntry.stat(follow_symlinks=False)` returns cached attributes from the initial `FindFirstFile` call.  No additional syscall is needed. This means metadata collection can be included in the scanning pass without a meaningful performance penalty.
 
 On Linux, `DirEntry.stat()` requires a real `stat()` syscall per file, so the overhead would be proportionally higher for deep trees.
 
 ### Concurrency hurts scanning performance
 
-`ThreadPoolExecutor` is **2.3× slower** and `asyncio` is **2.5× slower** than single-threaded `scandir stack` on the deep dataset. On the flat dataset, the gap widens to **23–25×**.
+`ThreadPoolExecutor` is **2.3× slower** and `asyncio` is **2.5× slower** than single-threaded `scandir stack` on the deep dataset. On the flat dataset, the gap widens to **23 to 25×**.
 
-Directory enumeration is fundamentally I/O-serialized at the OS level — the filesystem driver processes one directory read at a time. Adding concurrency introduces:
+Directory enumeration is fundamentally I/O-serialized at the OS level: the filesystem driver processes one directory read at a time. Adding concurrency introduces:
 
-1. **Thread/task dispatch overhead** — submitting, scheduling, and collecting futures.
-2. **Lock contention** — the `ThreadPoolExecutor`'s internal work queue and the shared output list.
-3. **Context switching** — the OS scheduler bounces between threads/tasks that are all waiting on the same filesystem lock.
+1. **Thread/task dispatch overhead**: submitting, scheduling, and collecting futures.
+2. **Lock contention**: the `ThreadPoolExecutor`'s internal work queue and the shared output list.
+3. **Context switching**: the OS scheduler bounces between threads/tasks that are all waiting on the same filesystem lock.
 
 The concurrent strategies do show proportionally better scaling from flat to deep (22.9× → 2.3× for threads, 24.9× → 2.5× for asyncio) because the deeper tree has more parallelizable directory reads. But even at ~730 directories, the dispatch overhead exceeds any benefit.
 
@@ -97,7 +97,7 @@ The `os.walk (set-comp)` one-liner uses a set comprehension, which means duplica
 - **Fastest approach** across both flat and deep datasets.
 - Collects `st_size` and `st_mtime` at negligible cost on Windows.
 - Rejects symlinks and catches `PermissionError` per-directory.
-- **Zero external dependencies** — stdlib only, `mypyc`-compilable.
+- **Zero external dependencies**: stdlib only, `mypyc`-compilable.
 - Iterative (no recursion depth limit for extremely deep trees).
 
 ```python
@@ -125,7 +125,7 @@ def scan(root: str) -> list[tuple[str, int, float]]:
 
 | Scenario | Recommendation |
 |----------|---------------|
-| Simple scripts / prototypes | `os.walk` — 1.2× slower but more readable, well-known pattern |
+| Simple scripts / prototypes | `os.walk`, 1.2× slower but more readable, well-known pattern |
 | Need `Path` objects downstream | Pay the `pathlib` cost at the boundary, not during enumeration |
-| Network filesystem | Single-threaded `scandir` still wins — network latency makes dispatch overhead even more dominant |
-| Extremely deep trees (>1000 levels) | Stack-based is already iterative — no recursion limit concern |
+| Network filesystem | Single-threaded `scandir` still wins; network latency makes dispatch overhead even more dominant |
+| Extremely deep trees (>1000 levels) | Stack-based is already iterative, so no recursion limit concern |
