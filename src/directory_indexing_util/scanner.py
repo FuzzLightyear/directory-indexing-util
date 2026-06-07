@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import os
-import stat
 from pathlib import Path
 
 import polars as pl
@@ -19,10 +18,11 @@ def scan_directory(
 ) -> pl.DataFrame:
     """Recursively enumerate regular files under *root*.
 
-    Uses an iterative stack-based ``os.scandir`` traversal — the fastest
-    enumeration strategy per project benchmarks.  Symlinks are skipped and
-    every resolved path is validated to stay within *root*, preventing
-    directory-junction escapes.
+    Uses an iterative stack-based ``os.scandir`` traversal, the fastest
+    enumeration strategy per project benchmarks.  Symlinks are skipped, and
+    each directory is resolved and confirmed within *root* before it is
+    entered, so directory-junction escapes are prevented and the files
+    beneath a contained directory are contained as well.
 
     Parameters
     ----------
@@ -71,7 +71,7 @@ def scan_directory(
     root_prefix = root_str if root_str.endswith(os.sep) else root_str + os.sep
     names: list[str] = []
     paths: list[str] = []
-    stack: list[Path] = [root_resolved]
+    stack: list[str] = [root_str]
     visited: set[str] = {root_str}
 
     while stack:
@@ -87,7 +87,7 @@ def scan_directory(
                         within = resolved == root_str or resolved.startswith(root_prefix)
                         if within and resolved not in visited:
                             visited.add(resolved)
-                            stack.append(Path(entry.path))
+                            stack.append(resolved)
                         continue
 
                     if not entry.is_file(follow_symlinks=False):
@@ -96,20 +96,12 @@ def scan_directory(
                     name = entry.name
                     if include is not None:
                         dot = name.rfind(".")
-                        ext = name[dot + 1:].lower() if dot > 0 else ""
+                        ext = name[dot + 1 :].lower() if dot > 0 else ""
                         if ext not in include:
                             continue
 
-                    try:
-                        if not stat.S_ISREG(entry.stat(follow_symlinks=False).st_mode):
-                            continue
-                    except OSError:
-                        continue
-
-                    resolved = str(Path(entry.path).resolve())
-                    if resolved == root_str or resolved.startswith(root_prefix):
-                        names.append(name)
-                        paths.append(resolved)
+                    names.append(name)
+                    paths.append(entry.path)
         except OSError:
             continue
 
