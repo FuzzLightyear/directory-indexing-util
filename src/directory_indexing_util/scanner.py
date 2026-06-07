@@ -15,6 +15,7 @@ def scan_directory(
     root: Path | str,
     *,
     include: set[str] | None = None,
+    exclude: set[str] | None = None,
 ) -> pl.DataFrame:
     """Recursively enumerate regular files under *root*.
 
@@ -35,6 +36,10 @@ def scan_directory(
         dot) to keep.  Files whose extension is not in this set are
         skipped.  Files with no extension match ``""``.  ``None`` keeps
         every file.
+    exclude : set of str, optional
+        Blacklist of normalized lowercase extensions to drop.  Files whose
+        extension is in this set are skipped.  Applied after *include* when
+        both are given.  ``None`` excludes nothing.
 
     Returns
     -------
@@ -94,10 +99,12 @@ def scan_directory(
                         continue
 
                     name = entry.name
-                    if include is not None:
+                    if include is not None or exclude is not None:
                         dot = name.rfind(".")
                         ext = name[dot + 1 :].lower() if dot > 0 else ""
-                        if ext not in include:
+                        if include is not None and ext not in include:
+                            continue
+                        if exclude is not None and ext in exclude:
                             continue
 
                     names.append(name)

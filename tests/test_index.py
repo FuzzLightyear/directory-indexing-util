@@ -84,3 +84,14 @@ def test_combined_call_equals_separate_calls(tmp_path: Path) -> None:
     separate = hash_dataframe(scan_directory(tmp_path)).sort("file_name")
 
     assert combined.equals(separate)
+
+
+def test_exclude_filter_propagates(tmp_path: Path) -> None:
+    """Exclude filtering applies to the scan phase of the combined call."""
+    (tmp_path / "keep.py").write_bytes(b"keep")
+    (tmp_path / "drop.log").write_bytes(b"drop")
+
+    df = index_directory(tmp_path, exclude={"log"})
+
+    assert df.height == 1
+    assert df.get_column("file_name")[0] == "keep.py"

@@ -275,3 +275,50 @@ def test_junction_cycle_does_not_crash(tmp_path: Path) -> None:
     assert "a.txt" in names
     assert "b.txt" in names
     assert names.count("a.txt") == 1  # the cycle does not duplicate entries
+
+
+# ---------------------------------------------------------------------------
+# Exclude (blacklist) filtering
+# ---------------------------------------------------------------------------
+
+
+def test_exclude_drops_matching_extensions(tmp_path: Path) -> None:
+    """``exclude`` removes files whose extension is in the blacklist."""
+    (tmp_path / "keep.py").write_text("a")
+    (tmp_path / "drop.txt").write_text("b")
+
+    df = scan_directory(tmp_path, exclude={"txt"})
+
+    assert df.height == 1
+    assert df.get_column("file_name")[0] == "keep.py"
+
+
+def test_exclude_none_keeps_every_file(tmp_path: Path) -> None:
+    """``exclude=None`` (default) drops nothing."""
+    (tmp_path / "a.py").write_text("x")
+    (tmp_path / "b.txt").write_text("x")
+
+    assert scan_directory(tmp_path, exclude=None).height == 2
+
+
+def test_exclude_empty_string_drops_extensionless_files(tmp_path: Path) -> None:
+    """Files with no extension match ``""`` and are dropped by ``exclude={""}``."""
+    (tmp_path / "Makefile").write_text("x")
+    (tmp_path / "a.py").write_text("x")
+
+    df = scan_directory(tmp_path, exclude={""})
+
+    assert df.height == 1
+    assert df.get_column("file_name")[0] == "a.py"
+
+
+def test_include_and_exclude_combine_at_library_level(tmp_path: Path) -> None:
+    """The library applies include then exclude; the CLI keeps them exclusive."""
+    (tmp_path / "a.py").write_text("x")
+    (tmp_path / "b.txt").write_text("x")
+    (tmp_path / "c.md").write_text("x")
+
+    df = scan_directory(tmp_path, include={"py", "txt"}, exclude={"txt"})
+
+    assert df.height == 1
+    assert df.get_column("file_name")[0] == "a.py"
