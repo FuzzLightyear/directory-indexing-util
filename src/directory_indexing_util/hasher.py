@@ -12,10 +12,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 import polars as pl
 
-from directory_indexing_util._algorithms import ALGORITHMS, DEFAULT_ALGORITHM
+from directory_indexing_util._algorithms import DEFAULT_ALGORITHM
 from directory_indexing_util.progress import rprogress
 
-__all__ = ["ALGORITHMS", "DEFAULT_ALGORITHM", "hash_dataframe"]
+__all__ = ["hash_dataframe"]
 
 
 def _is_non_local_path(path: str) -> bool:
