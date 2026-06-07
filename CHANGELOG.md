@@ -7,9 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-07
+
 ### Added
 
 - Optional `blake3` hash algorithm, selectable as `-a blake3` on the CLI and `algorithm="blake3"` in the library when the new `blake3` extra is installed (`uv sync --extra blake3`). It hashes faster than SHA-256 on a mixed-size benchmark and stays an opt-in dependency; the default remains SHA-256.
+
+### Security
+
+- The `hash` subcommand validates each path from an untrusted scan file before opening it: UNC and network paths, symlinks, and non-regular files are skipped. This prevents an outbound SMB credential leak from a crafted UNC path and hangs on FIFOs or devices.
+- CSV output neutralizes spreadsheet formula injection: any field beginning with `=`, `+`, `-`, `@`, a tab, or a carriage return is prefixed with a quote, so a hostile file name cannot execute when the CSV is opened in a spreadsheet.
+- The scanner survives NTFS junction cycles. It records visited resolved directories and skips repeats, and a malformed or cyclic entry is skipped rather than aborting the scan.
+- `hash_dataframe` requires the `file_path` column to be `Utf8`, rejecting a crafted integer column that `open()` would otherwise treat as a file descriptor.
+
+### Performance
+
+- Importing the package no longer eagerly loads polars and rich, so `dirindex --help` and `--version` run at about 68 ms cold start rather than about 288 ms.
+- The scanner resolves each directory once instead of resolving every file, cutting scan time from about 123 ms to about 15 ms on a 1572-file tree, with the same output and containment guarantees.
+
+### Fixed
+
+- The documented benchmark commands use `--extra research` instead of the non-existent `--group research`.
+- The README intro and API table match the actual output: file paths and content hashes, and the `algorithm="sha256"` default. `pre-commit` is now declared in the `dev` extra.
+
+### Changed
+
+- Documentation reworded for clarity and consistency, and the CLI internals were refactored (a `formats` module and shared command helpers) with no change in behavior.
 
 ## [0.1.0] - 2026-05-22
 
@@ -57,5 +80,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MVP feature set tagged as `mvp-complete`: scan, hash, index subcommands operational.
 - Library API surface tagged as `library-ready`: silent-by-default APIs, `Path | str` inputs, public re-exports, py.typed marker.
 
-[Unreleased]: https://github.com/FuzzLightyear/directory-indexing-util/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/FuzzLightyear/directory-indexing-util/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/FuzzLightyear/directory-indexing-util/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/FuzzLightyear/directory-indexing-util/releases/tag/v0.1.0
