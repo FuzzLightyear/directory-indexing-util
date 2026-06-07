@@ -97,7 +97,7 @@ def hash_dataframe(
 ) -> pl.DataFrame:
     """Hash files referenced by ``df['file_path']`` and return an extended DataFrame.
 
-    Uses ``ThreadPoolExecutor.map`` with ``hashlib.file_digest`` — the
+    Uses ``ThreadPoolExecutor.map`` with ``hashlib.file_digest``, the
     fastest stdlib strategy per project benchmarks (2,465 MB/s on
     SHA-256).  Order is preserved so the appended column aligns with
     the input rows.

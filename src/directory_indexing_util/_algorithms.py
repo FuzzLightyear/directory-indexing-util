@@ -5,9 +5,9 @@
 
 Isolated in a stdlib-only module so importing the algorithm choices does not
 transitively load polars or any other heavy dependency.  This is what allows
-``dirindex --version`` and ``dirindex --help`` — both of which need
+``dirindex --version`` and ``dirindex --help`` (both of which need
 :data:`ALGORITHMS` to construct the argparse choices but no actual hashing
-machinery — to return without paying the cost of loading ``hasher`` and its
+machinery) to return without paying the cost of loading ``hasher`` and its
 ``polars`` import.
 """
 
@@ -22,4 +22,4 @@ option (``blake2b``), or available for legacy interoperability (``md5``).
 """
 
 DEFAULT_ALGORITHM: str = "sha256"
-"""Default algorithm — universal integrity standard, ~2.4 GB/s in benchmarks."""
+"""Default algorithm: universal integrity standard, ~2.4 GB/s in benchmarks."""

@@ -55,7 +55,7 @@ def _infer_format(args: argparse.Namespace) -> str:
 
     When the user supplied ``-o`` as a *file path* (not a directory) and
     its extension is one of the recognised formats, that extension wins
-    over the argparse-default format — letting ``-o report.csv`` Just
+    over the argparse-default format, letting ``-o report.csv`` Just
     Work without also requiring ``-f csv``.  An explicit ``-f`` (i.e.,
     something other than the default) is always respected.
 
@@ -182,7 +182,7 @@ def _write_dataframe(df: pl.DataFrame, path: Path, fmt: str) -> None:
     Raises
     ------
     ValueError
-        If *fmt* is not a recognised format — defensive check, since
+        If *fmt* is not a recognised format, a defensive check, since
         argparse validates this for CLI use.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -249,7 +249,7 @@ def _write_manifest(
     command : str
         Subcommand that produced the output (``"hash"`` or ``"index"``).
     input_path : str
-        Original input — either the scan file (``hash``) or the source
+        Original input, either the scan file (``hash``) or the source
         directory (``index``).
     output_path : str
         Data file written alongside this manifest.
@@ -258,7 +258,7 @@ def _write_manifest(
     file_count : int
         Total number of rows in the produced index.
     failed_count : int
-        Subset of *file_count* for which ``file_hash`` is ``null`` —
+        Subset of *file_count* for which ``file_hash`` is ``null``,
         files that existed at scan time but could not be opened or read
         during hashing (e.g., deleted in between, permissions changed,
         locked by another process).  ``0`` when every file hashed
@@ -465,7 +465,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
 
 
 def _cmd_index(args: argparse.Namespace) -> None:
-    """Execute the ``index`` subcommand — scan + hash in a single pass."""
+    """Execute the ``index`` subcommand: scan + hash in a single pass."""
     from rich.console import Console  # noqa: PLC0415 - lazy
 
     from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
