@@ -28,6 +28,7 @@ from directory_indexing_util._algorithms import ALGORITHMS, DEFAULT_ALGORITHM
 
 if TYPE_CHECKING:
     import polars as pl
+    from rich.console import Console
 
 _FORMATS = ("parquet", "csv", "json", "ndjson")
 _DEFAULT_FORMAT = "parquet"
@@ -335,28 +336,96 @@ def _require_file(value: str) -> Path:
     return path
 
 
-def _cmd_scan(args: argparse.Namespace) -> None:
-    """Execute the ``scan`` subcommand."""
-    from rich.console import Console  # noqa: PLC0415 - lazy
+def _scan_with_status(console: Console, root: Path, include: set[str] | None) -> pl.DataFrame:
+    """Scan *root* under a Rich status spinner and return the result.
 
-    from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
+    Parameters
+    ----------
+    console : rich.console.Console
+        Console used to render the transient status line.
+    root : Path
+        Directory to scan.
+    include : set of str or None
+        Extension whitelist passed through to the scanner.
 
-    console = Console()
-
-    root = _require_directory(args.directory)
-
-    fmt = _infer_format(args)
-
-    include = _parse_extensions(args.include)
+    Returns
+    -------
+    pl.DataFrame
+        The scan result.
+    """
+    from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415 - lazy
 
     with console.status("[bold cyan]Scanning…") as status:
         df = scan_directory(root, include=include)
         status.update(f"[bold cyan]Scanned {df.height:,} files")
+    return df
 
-    output_path = _resolve_output_path(args.output, fmt)
+
+def _emit(
+    console: Console,
+    df: pl.DataFrame,
+    *,
+    output: str | None,
+    fmt: str,
+    prefix: str,
+    noun: str,
+    manifest: tuple[str, str, str] | None = None,
+) -> None:
+    """Write *df* to disk and print a one-line summary.
+
+    Parameters
+    ----------
+    console : rich.console.Console
+        Console used for the summary line.
+    df : pl.DataFrame
+        DataFrame to write.
+    output : str or None
+        User-supplied output path or directory.
+    fmt : str
+        Output format.
+    prefix : str
+        Filename stem prefix for a generated timestamped name.
+    noun : str
+        Word describing the rows in the summary (e.g., ``"files"``).
+    manifest : tuple of (command, input_path, algorithm) or None
+        When given, a sidecar ``.meta.json`` is written and the summary
+        reports any rows whose ``file_hash`` is ``null``.
+    """
+    output_path = _resolve_output_path(output, fmt, prefix=prefix)
     _write_dataframe(df, output_path, fmt)
 
-    console.print(f"[green]{df.height:,}[/green] files -> [bold]{output_path}[/bold]")
+    failed_count = 0
+    if manifest is not None:
+        command, input_path, algorithm = manifest
+        failed_count = int(df.get_column("file_hash").null_count())
+        _write_manifest(
+            output_path.with_suffix(".meta.json"),
+            command=command,
+            input_path=input_path,
+            output_path=str(output_path),
+            algorithm=algorithm,
+            file_count=df.height,
+            failed_count=failed_count,
+        )
+
+    summary = f"[green]{df.height:,}[/green] {noun}"
+    if failed_count:
+        summary += f" ([yellow]{failed_count} unreadable[/yellow])"
+    console.print(f"{summary} -> [bold]{output_path}[/bold]")
+
+
+def _cmd_scan(args: argparse.Namespace) -> None:
+    """Execute the ``scan`` subcommand."""
+    from rich.console import Console  # noqa: PLC0415 - lazy
+
+    console = Console()
+
+    root = _require_directory(args.directory)
+    fmt = _infer_format(args)
+    include = _parse_extensions(args.include)
+
+    df = _scan_with_status(console, root, include)
+    _emit(console, df, output=args.output, fmt=fmt, prefix="scan", noun="files")
 
 
 def _cmd_hash(args: argparse.Namespace) -> None:
@@ -383,24 +452,16 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
     df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
-    failed_count = int(df.get_column("file_hash").null_count())
 
-    output_path = _resolve_output_path(args.output, fmt, prefix="hash")
-    _write_dataframe(df, output_path, fmt)
-    _write_manifest(
-        output_path.with_suffix(".meta.json"),
-        command="hash",
-        input_path=str(input_path.resolve()),
-        output_path=str(output_path),
-        algorithm=args.algorithm,
-        file_count=df.height,
-        failed_count=failed_count,
+    _emit(
+        console,
+        df,
+        output=args.output,
+        fmt=fmt,
+        prefix="hash",
+        noun="hashes",
+        manifest=("hash", str(input_path.resolve()), args.algorithm),
     )
-
-    summary = f"[green]{df.height:,}[/green] hashes"
-    if failed_count:
-        summary += f" ([yellow]{failed_count} unreadable[/yellow])"
-    console.print(f"{summary} -> [bold]{output_path}[/bold]")
 
 
 def _cmd_index(args: argparse.Namespace) -> None:
@@ -408,39 +469,25 @@ def _cmd_index(args: argparse.Namespace) -> None:
     from rich.console import Console  # noqa: PLC0415 - lazy
 
     from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
-    from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
 
     console = Console()
 
     root = _require_directory(args.directory)
-
     fmt = _infer_format(args)
-
     include = _parse_extensions(args.include)
 
-    with console.status("[bold cyan]Scanning…") as status:
-        df = scan_directory(root, include=include)
-        status.update(f"[bold cyan]Scanned {df.height:,} files")
-
+    df = _scan_with_status(console, root, include)
     df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
-    failed_count = int(df.get_column("file_hash").null_count())
 
-    output_path = _resolve_output_path(args.output, fmt, prefix="index")
-    _write_dataframe(df, output_path, fmt)
-    _write_manifest(
-        output_path.with_suffix(".meta.json"),
-        command="index",
-        input_path=str(root.resolve()),
-        output_path=str(output_path),
-        algorithm=args.algorithm,
-        file_count=df.height,
-        failed_count=failed_count,
+    _emit(
+        console,
+        df,
+        output=args.output,
+        fmt=fmt,
+        prefix="index",
+        noun="indexed",
+        manifest=("index", str(root.resolve()), args.algorithm),
     )
-
-    summary = f"[green]{df.height:,}[/green] indexed"
-    if failed_count:
-        summary += f" ([yellow]{failed_count} unreadable[/yellow])"
-    console.print(f"{summary} -> [bold]{output_path}[/bold]")
 
 
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
