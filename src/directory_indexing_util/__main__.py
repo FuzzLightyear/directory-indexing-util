@@ -403,6 +403,60 @@ def _cmd_index(args: argparse.Namespace) -> None:
     console.print(f"{summary} -> [bold]{output_path}[/bold]")
 
 
+def _add_output_args(parser: argparse.ArgumentParser) -> None:
+    """Add the shared ``-o/--output`` and ``-f/--format`` options to *parser*."""
+    parser.add_argument(
+        "-o",
+        "--output",
+        help=(
+            "Output file path or directory.  When a directory is given, a "
+            "timestamped filename is generated automatically.  "
+            "Defaults to the current working directory."
+        ),
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=_FORMATS,
+        default=_DEFAULT_FORMAT,
+        help=f"Output file format (default: {_DEFAULT_FORMAT}).",
+    )
+
+
+def _add_include_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the shared ``-i/--include`` extension whitelist option to *parser*."""
+    parser.add_argument(
+        "-i",
+        "--include",
+        help=(
+            "Comma-separated whitelist of file extensions to keep "
+            "(e.g., 'jpg,png,gif').  Leading dots and case are normalized."
+        ),
+    )
+
+
+def _add_hash_args(parser: argparse.ArgumentParser) -> None:
+    """Add the shared ``-a/--algorithm`` and ``-w/--workers`` options to *parser*."""
+    parser.add_argument(
+        "-a",
+        "--algorithm",
+        choices=ALGORITHMS,
+        default=DEFAULT_ALGORITHM,
+        help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
+    )
+    parser.add_argument(
+        "-w",
+        "--workers",
+        type=int,
+        default=None,
+        help=(
+            "Worker thread count for hashing.  Defaults to an auto-tuned "
+            "value of min(cpu_count * 2, 32).  Lower it under CPU quotas "
+            "or when running multiple instances concurrently."
+        ),
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser with subcommands.
 
@@ -416,7 +470,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Performant, security-minded directory indexing utility.",
     )
     parser.add_argument(
-        "-V", "--version",
+        "-V",
+        "--version",
         action="version",
         version=f"%(prog)s {_get_version()}",
     )
@@ -424,27 +479,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     scan = sub.add_parser("scan", help="Recursively enumerate files in a directory.")
     scan.add_argument("directory", help="Source directory to scan.")
-    scan.add_argument(
-        "-o", "--output",
-        help=(
-            "Output file path or directory.  When a directory is given, a "
-            "timestamped filename is generated automatically.  "
-            "Defaults to the current working directory."
-        ),
-    )
-    scan.add_argument(
-        "-f", "--format",
-        choices=_FORMATS,
-        default=_DEFAULT_FORMAT,
-        help=f"Output file format (default: {_DEFAULT_FORMAT}).",
-    )
-    scan.add_argument(
-        "-i", "--include",
-        help=(
-            "Comma-separated whitelist of file extensions to keep "
-            "(e.g., 'jpg,png,gif').  Leading dots and case are normalized."
-        ),
-    )
+    _add_output_args(scan)
+    _add_include_arg(scan)
     scan.set_defaults(func=_cmd_scan)
 
     hash_cmd = sub.add_parser(
@@ -453,41 +489,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     hash_cmd.add_argument(
         "input",
-        help=(
-            "Scan output file (parquet/csv/json/ndjson) containing a "
-            "'file_path' column."
-        ),
+        help="Scan output file (parquet/csv/json/ndjson) containing a 'file_path' column.",
     )
-    hash_cmd.add_argument(
-        "-o", "--output",
-        help=(
-            "Output file path or directory.  When a directory is given, a "
-            "timestamped filename is generated automatically.  "
-            "Defaults to the current working directory."
-        ),
-    )
-    hash_cmd.add_argument(
-        "-f", "--format",
-        choices=_FORMATS,
-        default=_DEFAULT_FORMAT,
-        help=f"Output file format (default: {_DEFAULT_FORMAT}).",
-    )
-    hash_cmd.add_argument(
-        "-a", "--algorithm",
-        choices=ALGORITHMS,
-        default=DEFAULT_ALGORITHM,
-        help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
-    )
-    hash_cmd.add_argument(
-        "-w", "--workers",
-        type=int,
-        default=None,
-        help=(
-            "Worker thread count for hashing.  Defaults to an auto-tuned "
-            "value of min(cpu_count * 2, 32).  Lower it under CPU quotas "
-            "or when running multiple instances concurrently."
-        ),
-    )
+    _add_output_args(hash_cmd)
+    _add_hash_args(hash_cmd)
     hash_cmd.set_defaults(func=_cmd_hash)
 
     index_cmd = sub.add_parser(
@@ -495,43 +500,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Scan a directory and hash all files in a single pass.",
     )
     index_cmd.add_argument("directory", help="Source directory to scan and hash.")
-    index_cmd.add_argument(
-        "-o", "--output",
-        help=(
-            "Output file path or directory.  When a directory is given, a "
-            "timestamped filename is generated automatically.  "
-            "Defaults to the current working directory."
-        ),
-    )
-    index_cmd.add_argument(
-        "-f", "--format",
-        choices=_FORMATS,
-        default=_DEFAULT_FORMAT,
-        help=f"Output file format (default: {_DEFAULT_FORMAT}).",
-    )
-    index_cmd.add_argument(
-        "-i", "--include",
-        help=(
-            "Comma-separated whitelist of file extensions to keep "
-            "(e.g., 'jpg,png,gif').  Leading dots and case are normalized."
-        ),
-    )
-    index_cmd.add_argument(
-        "-a", "--algorithm",
-        choices=ALGORITHMS,
-        default=DEFAULT_ALGORITHM,
-        help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
-    )
-    index_cmd.add_argument(
-        "-w", "--workers",
-        type=int,
-        default=None,
-        help=(
-            "Worker thread count for hashing.  Defaults to an auto-tuned "
-            "value of min(cpu_count * 2, 32).  Lower it under CPU quotas "
-            "or when running multiple instances concurrently."
-        ),
-    )
+    _add_output_args(index_cmd)
+    _add_include_arg(index_cmd)
+    _add_hash_args(index_cmd)
     index_cmd.set_defaults(func=_cmd_index)
 
     return parser
