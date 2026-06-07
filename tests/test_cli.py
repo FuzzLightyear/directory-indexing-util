@@ -418,3 +418,29 @@ def test_no_subcommand_prints_help_with_exit_zero() -> None:
     assert "scan" in result.stdout
     assert "hash" in result.stdout
     assert "index" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Extension filters: include vs exclude
+# ---------------------------------------------------------------------------
+
+
+def test_scan_exclude_drops_extension(tmp_path: Path) -> None:
+    """``scan -x`` excludes the listed extensions end-to-end."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "keep.py").write_text("a")
+    (src / "drop.tmp").write_text("b")
+
+    out = tmp_path / "scan.parquet"
+    _run("scan", str(src), "-x", "tmp", "-o", str(out))
+
+    names = set(pl.read_parquet(out).get_column("file_name").to_list())
+    assert names == {"keep.py"}
+
+
+def test_include_and_exclude_are_mutually_exclusive(tmp_path: Path) -> None:
+    """Passing both -i and -x is rejected by argparse with exit code 2."""
+    result = _run("scan", str(tmp_path), "-i", "py", "-x", "tmp", check=False)
+    assert result.returncode == 2
+    assert "not allowed with" in result.stderr.lower()

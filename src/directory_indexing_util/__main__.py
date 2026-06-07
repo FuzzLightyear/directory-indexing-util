@@ -164,7 +164,12 @@ def _require_file(value: str) -> Path:
     return path
 
 
-def _scan_with_status(console: Console, root: Path, include: set[str] | None) -> pl.DataFrame:
+def _scan_with_status(
+    console: Console,
+    root: Path,
+    include: set[str] | None,
+    exclude: set[str] | None,
+) -> pl.DataFrame:
     """Scan *root* under a Rich status spinner and return the result.
 
     Parameters
@@ -175,6 +180,8 @@ def _scan_with_status(console: Console, root: Path, include: set[str] | None) ->
         Directory to scan.
     include : set of str or None
         Extension whitelist passed through to the scanner.
+    exclude : set of str or None
+        Extension blacklist passed through to the scanner.
 
     Returns
     -------
@@ -184,7 +191,7 @@ def _scan_with_status(console: Console, root: Path, include: set[str] | None) ->
     from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415 - lazy
 
     with console.status("[bold cyan]Scanning…") as status:
-        df = scan_directory(root, include=include)
+        df = scan_directory(root, include=include, exclude=exclude)
         status.update(f"[bold cyan]Scanned {df.height:,} files")
     return df
 
@@ -251,8 +258,9 @@ def _cmd_scan(args: argparse.Namespace) -> None:
     root = _require_directory(args.directory)
     fmt = _infer_format(args)
     include = _parse_extensions(args.include)
+    exclude = _parse_extensions(args.exclude)
 
-    df = _scan_with_status(console, root, include)
+    df = _scan_with_status(console, root, include, exclude)
     _emit(console, df, output=args.output, fmt=fmt, prefix="scan", noun="files")
 
 
@@ -303,8 +311,9 @@ def _cmd_index(args: argparse.Namespace) -> None:
     root = _require_directory(args.directory)
     fmt = _infer_format(args)
     include = _parse_extensions(args.include)
+    exclude = _parse_extensions(args.exclude)
 
-    df = _scan_with_status(console, root, include)
+    df = _scan_with_status(console, root, include, exclude)
     df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
 
     _emit(
@@ -338,14 +347,32 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_include_arg(parser: argparse.ArgumentParser) -> None:
-    """Add the shared ``-i/--include`` extension whitelist option to *parser*."""
-    parser.add_argument(
+def _add_filter_args(parser: argparse.ArgumentParser) -> None:
+    """Add the mutually exclusive ``-i/--include`` and ``-x/--exclude`` options.
+
+    Parameters
+    ----------
+    parser : argparse.ArgumentParser
+        Subparser to extend.  The two extension filters are mutually
+        exclusive: a whitelist that keeps only the listed extensions, or a
+        blacklist that drops them, never both at once.
+    """
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "-i",
         "--include",
         help=(
             "Comma-separated whitelist of file extensions to keep "
             "(e.g., 'jpg,png,gif').  Leading dots and case are normalized."
+        ),
+    )
+    group.add_argument(
+        "-x",
+        "--exclude",
+        help=(
+            "Comma-separated blacklist of file extensions to drop "
+            "(e.g., 'tmp,log').  Mutually exclusive with --include.  "
+            "Leading dots and case are normalized."
         ),
     )
 
@@ -395,7 +422,7 @@ def _build_parser() -> argparse.ArgumentParser:
     scan = sub.add_parser("scan", help="Recursively enumerate files in a directory.")
     scan.add_argument("directory", help="Source directory to scan.")
     _add_output_args(scan)
-    _add_include_arg(scan)
+    _add_filter_args(scan)
     scan.set_defaults(func=_cmd_scan)
 
     hash_cmd = sub.add_parser(
@@ -416,7 +443,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     index_cmd.add_argument("directory", help="Source directory to scan and hash.")
     _add_output_args(index_cmd)
-    _add_include_arg(index_cmd)
+    _add_filter_args(index_cmd)
     _add_hash_args(index_cmd)
     index_cmd.set_defaults(func=_cmd_index)
 
