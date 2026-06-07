@@ -24,12 +24,15 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-
-import polars as pl
+from typing import TYPE_CHECKING
 
 from directory_indexing_util._algorithms import ALGORITHMS, DEFAULT_ALGORITHM
-from directory_indexing_util.hasher import hash_dataframe
-from directory_indexing_util.scanner import scan_directory
+
+if TYPE_CHECKING:
+    import polars as pl
+
+    from directory_indexing_util.hasher import hash_dataframe
+    from directory_indexing_util.scanner import scan_directory
 
 try:
     __version__: str = version("directory-indexing-util")
@@ -44,6 +47,39 @@ __all__ = [
     "index_directory",
     "scan_directory",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Resolve the re-exported library functions lazily (PEP 562).
+
+    Importing the package stays cheap: polars and rich load only when
+    :func:`scan_directory` or :func:`hash_dataframe` is first accessed,
+    not at ``import directory_indexing_util`` time.
+
+    Parameters
+    ----------
+    name : str
+        Attribute requested from the package.
+
+    Returns
+    -------
+    object
+        The resolved function.
+
+    Raises
+    ------
+    AttributeError
+        If *name* is not a public attribute of the package.
+    """
+    if name == "scan_directory":
+        from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
+
+        return scan_directory
+    if name == "hash_dataframe":
+        from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
+
+        return hash_dataframe
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def index_directory(
@@ -85,5 +121,8 @@ def index_directory(
         DataFrame with columns ``file_name``, ``file_path``, and
         ``file_hash`` (the latter ``Utf8`` and nullable).
     """
+    from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
+    from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
+
     df = scan_directory(root, include=include)
     return hash_dataframe(df, algorithm=algorithm, workers=workers, desc=desc)
