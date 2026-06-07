@@ -87,6 +87,7 @@ def index_directory(
     *,
     algorithm: str = DEFAULT_ALGORITHM,
     include: set[str] | None = None,
+    exclude: set[str] | None = None,
     workers: int | None = None,
     desc: str | None = None,
 ) -> pl.DataFrame:
@@ -95,7 +96,7 @@ def index_directory(
     Convenience wrapper combining :func:`scan_directory` and
     :func:`hash_dataframe`.  Equivalent to::
 
-        df = scan_directory(root, include=include)
+        df = scan_directory(root, include=include, exclude=exclude)
         df = hash_dataframe(df, algorithm=algorithm, workers=workers, desc=desc)
 
     Parameters
@@ -106,6 +107,9 @@ def index_directory(
         Hash algorithm.  See :data:`ALGORITHMS` for accepted values.
     include : set of str, optional
         Extension whitelist applied during scanning.  See
+        :func:`scan_directory` for semantics.
+    exclude : set of str, optional
+        Extension blacklist applied during scanning.  See
         :func:`scan_directory` for semantics.
     workers : int or None, default ``None``
         Number of worker threads for the hashing phase.  ``None`` uses
@@ -124,5 +128,5 @@ def index_directory(
     from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
     from directory_indexing_util.scanner import scan_directory  # noqa: PLC0415
 
-    df = scan_directory(root, include=include)
+    df = scan_directory(root, include=include, exclude=exclude)
     return hash_dataframe(df, algorithm=algorithm, workers=workers, desc=desc)
