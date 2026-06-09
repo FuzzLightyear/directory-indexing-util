@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Extension blacklist. `scan` and `index` accept `-x/--exclude` (mutually exclusive with `-i/--include`), and `scan_directory`/`index_directory` accept `exclude=`, to drop files by extension. The library can combine include and exclude (include applied first, then exclude); the CLI keeps the two mutually exclusive.
 
+### Changed
+
+- All runtime and development dependencies are pinned to exact versions, and a hash-verified `uv.lock` is now committed, so installs are reproducible and tamper-evident. `pip-audit` reports no known vulnerabilities for the pinned set.
+
 ## [0.2.0] - 2026-06-07
 
 ### Added
