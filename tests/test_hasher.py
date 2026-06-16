@@ -316,10 +316,12 @@ def test_blake3_matches_reference(tmp_path: Path) -> None:
     assert digest == blake3_mod.blake3(content).hexdigest()
 
 
-def test_blake3_listed_exactly_when_installed() -> None:
-    """ALGORITHMS includes blake3 if and only if the package is importable."""
-    import importlib.util
+def test_blake3_always_recognized() -> None:
+    """ALGORITHMS lists blake3 regardless of whether the backend is installed.
 
+    Availability is enforced at hash time, not by membership, so a saved
+    profile or CLI flag naming blake3 stays portable across installs.
+    """
     from directory_indexing_util import ALGORITHMS
 
-    assert ("blake3" in ALGORITHMS) == (importlib.util.find_spec("blake3") is not None)
+    assert "blake3" in ALGORITHMS

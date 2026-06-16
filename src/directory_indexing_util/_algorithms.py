@@ -13,20 +13,18 @@ machinery) to return without paying the cost of loading ``hasher`` and its
 
 from __future__ import annotations
 
-import importlib.util
+ALGORITHMS: tuple[str, ...] = ("sha256", "sha512", "blake2b", "md5", "blake3")
+"""Recognized hash algorithm names exposed by the CLI and library.
 
-ALGORITHMS: tuple[str, ...] = ("sha256", "sha512", "blake2b", "md5")
-"""Curated set of hash algorithms exposed by the CLI and library.
-
-Limited to algorithms supported by :func:`hashlib.file_digest` that are either
-modern integrity standards (``sha256``, ``sha512``), the fastest in-stdlib
-option (``blake2b``), or available for legacy interoperability (``md5``).
-``blake3`` is appended when the optional blake3 package is importable, offering
-a faster non-stdlib option without making it a hard dependency.
+The stdlib options are modern integrity standards (``sha256``, ``sha512``), the
+fastest in-stdlib choice (``blake2b``), and ``md5`` for legacy interoperability.
+``blake3`` is a faster non-stdlib option that stays optional, yet it is always a
+recognized name so a saved profile or CLI flag is portable across installs.
+Whether the ``blake3`` backend is actually installed is checked at hash time in
+:func:`directory_indexing_util.hasher.hash_dataframe`, where a missing package
+yields a clear "install the blake3 extra" error rather than a load-time or
+argument-parse failure.
 """
-
-if importlib.util.find_spec("blake3") is not None:
-    ALGORITHMS = (*ALGORITHMS, "blake3")
 
 DEFAULT_ALGORITHM: str = "sha256"
 """Default algorithm: universal integrity standard, ~2.4 GB/s in benchmarks."""
