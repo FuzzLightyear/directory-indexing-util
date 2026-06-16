@@ -25,6 +25,7 @@ from directory_indexing_util.__main__ import (
     _apply_config,
     _infer_format,
     _parse_extensions,
+    _profile_flags,
     _read_dataframe,
     _resolve_output_path,
     _save_captured_profile,
@@ -364,3 +365,22 @@ def test_save_captured_profile_records_resolved_settings(cfg: Path) -> None:
         "mode": "whitelist",
         "ext": ["py"],
     }
+
+
+def test_profile_flags_renders_every_field() -> None:
+    """A full profile renders as the dirindex flags that reproduce it."""
+    flags = _profile_flags(
+        {
+            "algorithm": "blake3",
+            "workers": 4,
+            "format": "csv",
+            "mode": "blacklist",
+            "ext": ["log", "tmp"],
+        }
+    )
+    assert flags == "-a blake3 -w 4 -f csv -x log,tmp"
+
+
+def test_profile_flags_empty_profile_is_blank() -> None:
+    """A profile with no settings renders as an empty string."""
+    assert _profile_flags({}) == ""
