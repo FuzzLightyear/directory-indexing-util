@@ -17,13 +17,17 @@ from pathlib import Path
 import polars as pl
 import pytest
 
+from directory_indexing_util import config
 from directory_indexing_util.__main__ import (
     _DEFAULT_FORMAT,
     _FORMATS,
+    _UNSET,
+    _apply_config,
     _infer_format,
     _parse_extensions,
     _read_dataframe,
     _resolve_output_path,
+    _save_captured_profile,
     _write_dataframe,
 )
 
@@ -237,3 +241,126 @@ def test_write_parquet_does_not_alter_values(tmp_path: Path) -> None:
     _write_dataframe(df, out, "parquet")
     back = _read_dataframe(out)
     assert back.get_column("file_name")[0] == "=1+1"
+
+
+# ---------------------------------------------------------------------------
+# Profile application (_apply_config / _save_captured_profile)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def cfg(monkeypatch, tmp_path: Path) -> Path:
+    """Isolate config and profile storage in a temp dir for one test."""
+    monkeypatch.setenv("DIRINDEX_CONFIG_DIR", str(tmp_path))
+    monkeypatch.delenv("DIRINDEX_PROFILES_DIR", raising=False)
+    return tmp_path
+
+
+def _index_ns(**overrides: object) -> argparse.Namespace:
+    """Build an index-shaped namespace with every overridable option unset."""
+    ns = argparse.Namespace(
+        directory=".",
+        output=None,
+        profile=None,
+        save_profile=None,
+        profiles_dir=None,
+        format=_UNSET,
+        algorithm=_UNSET,
+        workers=_UNSET,
+        include=_UNSET,
+        exclude=_UNSET,
+    )
+    ns.__dict__.update(overrides)
+    return ns
+
+
+def test_apply_config_fills_builtin_defaults(cfg: Path) -> None:
+    """With no profile, every unset option resolves to its built-in default."""
+    ns = _index_ns()
+    _apply_config(ns)
+    assert (ns.format, ns.algorithm, ns.workers) == ("parquet", "sha256", None)
+    assert ns.include is None
+    assert ns.exclude is None
+
+
+def test_apply_config_profile_fills_unset_options(cfg: Path) -> None:
+    """A named profile fills the options the user did not pass."""
+    config._save_profile(
+        "p",
+        {"algorithm": "blake3", "workers": 4, "format": "csv"},
+        profiles_dir=config._profiles_dir(),
+    )
+    ns = _index_ns(profile="p")
+    _apply_config(ns)
+    assert (ns.format, ns.algorithm, ns.workers) == ("csv", "blake3", 4)
+
+
+def test_apply_config_explicit_flag_beats_profile(cfg: Path) -> None:
+    """An explicit flag wins over the profile; unset options still fill."""
+    config._save_profile(
+        "p", {"algorithm": "sha512", "format": "csv"}, profiles_dir=config._profiles_dir()
+    )
+    ns = _index_ns(profile="p", algorithm="md5")
+    _apply_config(ns)
+    assert ns.algorithm == "md5"
+    assert ns.format == "csv"
+
+
+def test_apply_config_applies_configured_default(cfg: Path) -> None:
+    """With no --profile, a configured default profile applies."""
+    pdir = config._profiles_dir()
+    config._save_profile("d", {"algorithm": "sha512"}, profiles_dir=pdir)
+    config._set_default("d")
+    ns = _index_ns()
+    _apply_config(ns)
+    assert ns.algorithm == "sha512"
+
+
+def test_apply_config_unknown_profile_exits(cfg: Path) -> None:
+    """``--profile`` naming nothing exits non-zero."""
+    with pytest.raises(SystemExit):
+        _apply_config(_index_ns(profile="ghost"))
+
+
+def test_apply_config_whitelist_profile_sets_include(cfg: Path) -> None:
+    """A whitelist profile fills --include and leaves --exclude unset."""
+    config._save_profile(
+        "imgs", {"mode": "whitelist", "ext": ["jpg", "png"]}, profiles_dir=config._profiles_dir()
+    )
+    ns = _index_ns(profile="imgs")
+    _apply_config(ns)
+    assert ns.include == "jpg,png"
+    assert ns.exclude is None
+
+
+def test_apply_config_explicit_filter_blocks_profile_filter(cfg: Path) -> None:
+    """An explicit -i suppresses a profile's blacklist, preserving exclusivity."""
+    config._save_profile(
+        "drop", {"mode": "blacklist", "ext": ["tmp"]}, profiles_dir=config._profiles_dir()
+    )
+    ns = _index_ns(profile="drop", include="py")
+    _apply_config(ns)
+    assert ns.include == "py"
+    assert ns.exclude is None
+
+
+def test_apply_config_rejects_out_of_range_workers(cfg: Path) -> None:
+    """An explicit --workers beyond the cap exits non-zero."""
+    with pytest.raises(SystemExit):
+        _apply_config(_index_ns(workers=10**6))
+
+
+def test_save_captured_profile_records_resolved_settings(cfg: Path) -> None:
+    """--save-profile persists the resolved how, mapping include to mode and ext."""
+    pdir = config._profiles_dir()
+    ns = _index_ns(
+        save_profile="cap", algorithm="sha512", workers=2, format="csv", include="py", exclude=None
+    )
+    _save_captured_profile(ns, pdir)
+    assert config._get_profile("cap", profiles_dir=pdir) == {
+        "algorithm": "sha512",
+        "workers": 2,
+        "format": "csv",
+        "mode": "whitelist",
+        "ext": ["py"],
+    }

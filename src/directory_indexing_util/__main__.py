@@ -36,6 +36,16 @@ if TYPE_CHECKING:
     import polars as pl
     from rich.console import Console
 
+_UNSET = object()
+"""Sentinel default for profile-overridable options, marking "not given"."""
+
+_OVERRIDABLE = ("format", "algorithm", "workers")
+_BUILTIN_DEFAULTS: dict[str, object] = {
+    "format": _DEFAULT_FORMAT,
+    "algorithm": DEFAULT_ALGORITHM,
+    "workers": None,
+}
+
 
 def _get_version() -> str:
     """Return the installed package version, or a sentinel if uninstalled.
@@ -249,12 +259,153 @@ def _emit(
     console.print(f"{summary} -> [bold]{output_path}[/bold]")
 
 
+def _apply_filter(args: argparse.Namespace, profile: dict[str, object]) -> None:
+    """Fill the extension filter from *profile* unless the user set one.
+
+    Applies the profile's ``mode``/``ext`` to ``include`` or ``exclude`` only
+    when the command offers the filter and the user passed neither, preserving
+    the mutually exclusive contract.  Any still-unset filter resolves to
+    ``None``.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed arguments, mutated in place.
+    profile : dict
+        The profile being applied (may be empty).
+    """
+    has_inc = hasattr(args, "include")
+    has_exc = hasattr(args, "exclude")
+    if not (has_inc or has_exc):
+        return
+    user_set = (has_inc and args.include is not _UNSET) or (has_exc and args.exclude is not _UNSET)
+    if not user_set:
+        mode, ext = profile.get("mode"), profile.get("ext")
+        if mode and ext:
+            joined = ",".join(ext)
+            if mode == "whitelist" and has_inc:
+                args.include = joined
+            elif mode == "blacklist" and has_exc:
+                args.exclude = joined
+    if has_inc and args.include is _UNSET:
+        args.include = None
+    if has_exc and args.exclude is _UNSET:
+        args.exclude = None
+
+
+def _apply_config(args: argparse.Namespace) -> Path:
+    """Resolve profile settings into *args* in place and return the profiles dir.
+
+    Loads ``--profile`` (or the configured default), fills each
+    profile-overridable option the user did not pass, applies the extension
+    filter under the mutual-exclusion guard, and bounds the worker count.  The
+    config module is imported here, never at parse time, so the
+    ``--help``/``--version`` fast path stays free of it.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed arguments, mutated in place.
+
+    Returns
+    -------
+    Path
+        The resolved profiles directory, for a later ``--save-profile``.
+
+    Raises
+    ------
+    SystemExit
+        If ``--profile`` names no profile or is invalid, or ``--workers`` is
+        out of range.
+    """
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+
+    name = getattr(args, "profile", None)
+    if name:
+        try:
+            profile = config._get_profile(name, profiles_dir=profiles_dir)
+        except KeyError:
+            logger.error("No such profile: {}", name)
+            raise SystemExit(1) from None
+        except config.ConfigError as exc:
+            logger.error("{}", exc)
+            raise SystemExit(1) from exc
+    else:
+        profile = {}
+        default = config._get_default()
+        if default:
+            try:
+                profile = config._get_profile(default, profiles_dir=profiles_dir)
+                logger.info("Using default profile {!r}.", default)
+            except (KeyError, config.ConfigError):
+                profile = {}
+
+    for dest in _OVERRIDABLE:
+        if hasattr(args, dest) and getattr(args, dest) is _UNSET:
+            setattr(args, dest, profile.get(dest, _BUILTIN_DEFAULTS[dest]))
+    _apply_filter(args, profile)
+
+    workers = getattr(args, "workers", None)
+    if isinstance(workers, int) and not 1 <= workers <= config._MAX_WORKERS:
+        logger.error("workers must be 1 to {}, got {}", config._MAX_WORKERS, workers)
+        raise SystemExit(1)
+    return profiles_dir
+
+
+def _save_captured_profile(args: argparse.Namespace, profiles_dir: Path) -> None:
+    """Save the run's resolved settings as a profile when ``--save-profile`` is set.
+
+    Captures the resolved algorithm, workers, and format plus the active
+    extension filter, then reports whether the profile was created or updated.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Resolved arguments (after :func:`_apply_config`).
+    profiles_dir : Path
+        Directory to save into, from :func:`_apply_config`.
+
+    Raises
+    ------
+    SystemExit
+        If the captured settings fail validation.
+    """
+    name = getattr(args, "save_profile", None)
+    if not name:
+        return
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    fields: dict[str, object] = {
+        "format": getattr(args, "format", None),
+        "algorithm": getattr(args, "algorithm", None),
+        "workers": getattr(args, "workers", None),
+    }
+    if getattr(args, "include", None):
+        fields["mode"], fields["ext"] = "whitelist", args.include
+    elif getattr(args, "exclude", None):
+        fields["mode"], fields["ext"] = "blacklist", args.exclude
+    try:
+        existed = config._resolve_profile_file(name, profiles_dir=profiles_dir) is not None
+        config._save_profile(name, fields, profiles_dir=profiles_dir)
+    except config.ConfigError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
+    logger.info("{} profile {!r}.", "Updated" if existed else "Saved", config._require_name(name))
+
+
 def _cmd_scan(args: argparse.Namespace) -> None:
     """Execute the ``scan`` subcommand."""
     from rich.console import Console  # noqa: PLC0415 - lazy
 
     console = Console()
 
+    profiles_dir = _apply_config(args)
     root = _require_directory(args.directory)
     fmt = _infer_format(args)
     include = _parse_extensions(args.include)
@@ -262,6 +413,7 @@ def _cmd_scan(args: argparse.Namespace) -> None:
 
     df = _scan_with_status(console, root, include, exclude)
     _emit(console, df, output=args.output, fmt=fmt, prefix="scan", noun="files")
+    _save_captured_profile(args, profiles_dir)
 
 
 def _cmd_hash(args: argparse.Namespace) -> None:
@@ -273,6 +425,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
 
     console = Console()
 
+    profiles_dir = _apply_config(args)
     input_path = _require_file(args.input)
 
     fmt = _infer_format(args)
@@ -298,6 +451,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         noun="hashes",
         manifest=("hash", str(input_path.resolve()), args.algorithm),
     )
+    _save_captured_profile(args, profiles_dir)
 
 
 def _cmd_index(args: argparse.Namespace) -> None:
@@ -308,6 +462,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
 
     console = Console()
 
+    profiles_dir = _apply_config(args)
     root = _require_directory(args.directory)
     fmt = _infer_format(args)
     include = _parse_extensions(args.include)
@@ -325,6 +480,7 @@ def _cmd_index(args: argparse.Namespace) -> None:
         noun="indexed",
         manifest=("index", str(root.resolve()), args.algorithm),
     )
+    _save_captured_profile(args, profiles_dir)
 
 
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
@@ -342,7 +498,7 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
         "-f",
         "--format",
         choices=_FORMATS,
-        default=_DEFAULT_FORMAT,
+        default=_UNSET,
         help=f"Output file format (default: {_DEFAULT_FORMAT}).",
     )
 
@@ -361,6 +517,7 @@ def _add_filter_args(parser: argparse.ArgumentParser) -> None:
     group.add_argument(
         "-i",
         "--include",
+        default=_UNSET,
         help=(
             "Comma-separated whitelist of file extensions to keep "
             "(e.g., 'jpg,png,gif').  Leading dots and case are normalized."
@@ -369,6 +526,7 @@ def _add_filter_args(parser: argparse.ArgumentParser) -> None:
     group.add_argument(
         "-x",
         "--exclude",
+        default=_UNSET,
         help=(
             "Comma-separated blacklist of file extensions to drop "
             "(e.g., 'tmp,log').  Mutually exclusive with --include.  "
@@ -383,19 +541,38 @@ def _add_hash_args(parser: argparse.ArgumentParser) -> None:
         "-a",
         "--algorithm",
         choices=ALGORITHMS,
-        default=DEFAULT_ALGORITHM,
+        default=_UNSET,
         help=f"Hash algorithm (default: {DEFAULT_ALGORITHM}).",
     )
     parser.add_argument(
         "-w",
         "--workers",
         type=int,
-        default=None,
+        default=_UNSET,
         help=(
             "Worker thread count for hashing.  Defaults to an auto-tuned "
             "value of min(cpu_count * 2, 32).  Lower it under CPU quotas "
             "or when running multiple instances concurrently."
         ),
+    )
+
+
+def _add_profile_args(parser: argparse.ArgumentParser) -> None:
+    """Add ``--profile``, ``--save-profile``, and ``--profiles-dir`` to *parser*."""
+    parser.add_argument(
+        "--profile",
+        metavar="NAME",
+        help="Apply a saved profile's settings.  Explicit flags override it.",
+    )
+    parser.add_argument(
+        "--save-profile",
+        metavar="NAME",
+        help="Save the run's resolved settings as a profile of this name.",
+    )
+    parser.add_argument(
+        "--profiles-dir",
+        metavar="DIR",
+        help="Directory holding profile files, overriding the configured location.",
     )
 
 
@@ -423,6 +600,7 @@ def _build_parser() -> argparse.ArgumentParser:
     scan.add_argument("directory", help="Source directory to scan.")
     _add_output_args(scan)
     _add_filter_args(scan)
+    _add_profile_args(scan)
     scan.set_defaults(func=_cmd_scan)
 
     hash_cmd = sub.add_parser(
@@ -435,6 +613,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     _add_output_args(hash_cmd)
     _add_hash_args(hash_cmd)
+    _add_profile_args(hash_cmd)
     hash_cmd.set_defaults(func=_cmd_hash)
 
     index_cmd = sub.add_parser(
@@ -445,6 +624,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_output_args(index_cmd)
     _add_filter_args(index_cmd)
     _add_hash_args(index_cmd)
+    _add_profile_args(index_cmd)
     index_cmd.set_defaults(func=_cmd_index)
 
     return parser
