@@ -23,6 +23,7 @@ from directory_indexing_util.__main__ import (
     _FORMATS,
     _UNSET,
     _apply_config,
+    _cmd_profile_update,
     _infer_format,
     _parse_extensions,
     _profile_flags,
@@ -384,3 +385,52 @@ def test_profile_flags_renders_every_field() -> None:
 def test_profile_flags_empty_profile_is_blank() -> None:
     """A profile with no settings renders as an empty string."""
     assert _profile_flags({}) == ""
+
+
+def _update_ns(name: str, **overrides: object) -> argparse.Namespace:
+    """Build a ``profile update`` namespace with every how-flag unset."""
+    ns = argparse.Namespace(
+        name=name,
+        profiles_dir=None,
+        algorithm=_UNSET,
+        workers=_UNSET,
+        format=_UNSET,
+        include=_UNSET,
+        exclude=_UNSET,
+    )
+    ns.__dict__.update(overrides)
+    return ns
+
+
+def test_cmd_profile_update_merges_fields(cfg: Path) -> None:
+    """update changes the given field and keeps the others."""
+    pdir = config._profiles_dir()
+    config._save_profile(
+        "p",
+        {"algorithm": "sha256", "format": "csv", "mode": "whitelist", "ext": ["jpg"]},
+        profiles_dir=pdir,
+    )
+    _cmd_profile_update(_update_ns("p", algorithm="blake3"))
+    assert config._get_profile("p", profiles_dir=pdir) == {
+        "algorithm": "blake3",
+        "format": "csv",
+        "mode": "whitelist",
+        "ext": ["jpg"],
+    }
+
+
+def test_cmd_profile_update_replaces_filter_as_a_unit(cfg: Path) -> None:
+    """A new filter on update replaces the existing mode and ext together."""
+    pdir = config._profiles_dir()
+    config._save_profile("p", {"mode": "whitelist", "ext": ["jpg"]}, profiles_dir=pdir)
+    _cmd_profile_update(_update_ns("p", exclude="tmp,log"))
+    assert config._get_profile("p", profiles_dir=pdir) == {
+        "mode": "blacklist",
+        "ext": ["log", "tmp"],
+    }
+
+
+def test_cmd_profile_update_missing_exits(cfg: Path) -> None:
+    """update on a profile that does not exist exits non-zero."""
+    with pytest.raises(SystemExit):
+        _cmd_profile_update(_update_ns("ghost", algorithm="sha256"))

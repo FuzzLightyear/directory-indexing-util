@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Extension blacklist. `scan` and `index` accept `-x/--exclude` (mutually exclusive with `-i/--include`), and `scan_directory`/`index_directory` accept `exclude=`, to drop files by extension. The library can combine include and exclude (include applied first, then exclude); the CLI keeps the two mutually exclusive.
-- Configuration profiles. Save the *how* of a run (algorithm, workers, format, extension filter) as a named preset and reuse it with `--profile` on `scan`/`hash`/`index`, or capture it from a run with `--save-profile`. A `dirindex profile` subcommand lists, shows, saves, deletes, and sets a default; the profiles directory is settable via `dirindex profile dir`, `--profiles-dir`, or `$DIRINDEX_PROFILES_DIR`. Profiles are per-user TOML files parsed with the standard library `tomllib`, and explicit flags always override a profile.
+- Configuration profiles. Save the *how* of a run (algorithm, workers, format, extension filter) as a named preset and reuse it with `--profile` on `scan`/`hash`/`index`, or capture it from a run with `--save-profile`. A `dirindex profile` subcommand lists, shows, saves (replace) or updates (merge), deletes, and sets a default; the profiles directory is settable via `dirindex profile dir`, `--profiles-dir`, or `$DIRINDEX_PROFILES_DIR`. Profiles are per-user TOML files parsed with the standard library `tomllib`, and explicit flags always override a profile.
 
 ### Changed
 

@@ -504,8 +504,8 @@ def test_explicit_flag_overrides_applied_profile(profiles_env: Path, tmp_path: P
     assert manifest["hash_algorithm"] == "md5"
 
 
-def test_save_profile_reports_created_then_updated(profiles_env: Path, tmp_path: Path) -> None:
-    """The first ``--save-profile`` says Saved; a second one says Updated."""
+def test_save_profile_reports_created_then_replaced(profiles_env: Path, tmp_path: Path) -> None:
+    """The first ``--save-profile`` says Saved; a second one says Replaced."""
     src = tmp_path / "data"
     src.mkdir()
     (src / "a.bin").write_bytes(b"x")
@@ -517,7 +517,7 @@ def test_save_profile_reports_created_then_updated(profiles_env: Path, tmp_path:
     second = _run(
         "index", str(src), "-a", "sha512", "--save-profile", "p", "-o", str(tmp_path / "2.parquet")
     )
-    assert "Updated profile" in second.stderr
+    assert "Replaced profile" in second.stderr
 
 
 def test_unknown_profile_exits_one(profiles_env: Path, tmp_path: Path) -> None:
@@ -554,10 +554,27 @@ def test_profile_save_show_list_delete(profiles_env: Path) -> None:
     assert _run("profile", "list").stdout.strip() == ""
 
 
-def test_profile_second_save_reports_update(profiles_env: Path) -> None:
-    """Saving an existing profile name reports Updated, not Saved."""
+def test_profile_second_save_reports_replace(profiles_env: Path) -> None:
+    """``save`` on an existing name reports Replaced, not Saved."""
     assert "Saved profile" in _run("profile", "save", "p", "-a", "sha256").stderr
-    assert "Updated profile" in _run("profile", "save", "p", "-a", "sha512").stderr
+    assert "Replaced profile" in _run("profile", "save", "p", "-a", "sha512").stderr
+
+
+def test_profile_update_changes_one_field_keeping_rest(profiles_env: Path) -> None:
+    """``update`` changes the named field and reports Updated, keeping the others."""
+    _run("profile", "save", "p", "-a", "sha256", "-f", "csv", "-i", "py")
+    updated = _run("profile", "update", "p", "-a", "blake3")
+    assert "Updated profile" in updated.stderr
+    shown = _run("profile", "show", "p").stdout
+    assert "-a blake3" in shown
+    assert "-f csv" in shown
+    assert "-i py" in shown
+
+
+def test_profile_update_missing_exits_one(profiles_env: Path) -> None:
+    """``update`` on a profile that does not exist fails with exit code 1."""
+    result = _run("profile", "update", "ghost", "-a", "sha256", check=False)
+    assert result.returncode == 1
 
 
 def test_profile_default_set_query_clear(profiles_env: Path) -> None:

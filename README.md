@@ -148,6 +148,7 @@ dirindex scan /path/to/other --profile photos -f json   # -f json overrides the 
 # Manage profiles
 dirindex profile list              # names, with the default marked
 dirindex profile show photos       # the flags the profile applies
+dirindex profile update photos -a sha512   # change one field, keep the rest
 dirindex profile default photos    # auto-applied when no --profile is given
 dirindex profile delete photos     # prints the command to recreate it
 ```
@@ -170,7 +171,8 @@ format    = "csv"
 |---|---|
 | `list` | List profile names; the default is marked. |
 | `show <name>` | Print the flags a profile applies. |
-| `save <name> [flags]` | Create or update a profile from `-a`, `-w`, `-f`, and `-i`/`-x`. The profile becomes exactly those flags. |
+| `save <name> [flags]` | Define a profile from `-a`, `-w`, `-f`, and `-i`/`-x`: it becomes exactly those flags, replacing any existing profile of that name. |
+| `update <name> [flags]` | Change only the given fields of an existing profile, keeping the rest. A new `-i`/`-x` replaces the whole filter. |
 | `delete <name>` | Delete a profile and print the `profile save` command that recreates it. |
 | `default [<name>] [--clear]` | Show, set, or clear the auto-applied default. |
 | `dir [<path>]` | Show or persist the profiles directory. |
