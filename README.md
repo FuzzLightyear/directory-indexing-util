@@ -132,6 +132,51 @@ The manifest is UTF-8 encoded with LF line endings on every platform, so the fil
 
 **Why a sidecar instead of an extra column?** Run metadata (algorithm, input directory, output path, timestamp, counts) is per-run, not per-row. Constant columns would be a strict subset of this information *and* redundant on every row. The sidecar captures full provenance once.
 
+## Profiles
+
+A profile is a saved preset of the *how* of a run: algorithm, worker count, output format, and extension filter. It travels by name across directories, so you stop retyping the same flags.
+
+```bash
+# Save a preset: capture the flags from a run, or define one directly
+dirindex index /path/to/photos -i jpg,png -a blake3 -f csv --save-profile photos
+dirindex profile save photos -i jpg,png -a blake3 -f csv
+
+# Apply it; explicit flags still win
+dirindex index /path/to/other --profile photos
+dirindex scan /path/to/other --profile photos -f json   # -f json overrides the profile
+
+# Manage profiles
+dirindex profile list              # names, with the default marked
+dirindex profile show photos       # the flags the profile applies
+dirindex profile default photos    # auto-applied when no --profile is given
+dirindex profile delete photos     # prints the command to recreate it
+```
+
+You can also hand-author a profile: drop a `<name>.toml` into the profiles directory.
+
+```toml
+# photos.toml
+algorithm = "blake3"
+mode      = "whitelist"      # or "blacklist"
+ext       = ["jpg", "png"]   # or: ext = "jpg,png"
+format    = "csv"
+```
+
+**Precedence:** an explicit flag beats a `--profile` value, which beats the configured default profile, which beats the built-in default. A profile stores only the *how* (`mode`, `ext`, `algorithm`, `workers`, `format`), never the directory, input, or output: where a run reads and writes is per-run.
+
+**Where profiles live.** By default the per-user config directory (`%APPDATA%\dirindex` on Windows, `~/Library/Application Support/dirindex` on macOS, `$XDG_CONFIG_HOME/dirindex` or `~/.config/dirindex` elsewhere), in a `profiles/` subdirectory, alongside a `settings.toml` recording the chosen directory and default. Point it elsewhere for one run with `--profiles-dir` or `$DIRINDEX_PROFILES_DIR`, or persist a location with `dirindex profile dir <path>`. The location is never derived from where the package is installed, so profiles behave identically from a source checkout, a `pip install`, or a `uvx` run, and are never written into a scanned repository.
+
+| `profile` action | Description |
+|---|---|
+| `list` | List profile names; the default is marked. |
+| `show <name>` | Print the flags a profile applies. |
+| `save <name> [flags]` | Create or update a profile from `-a`, `-w`, `-f`, and `-i`/`-x`. The profile becomes exactly those flags. |
+| `delete <name>` | Delete a profile and print the `profile save` command that recreates it. |
+| `default [<name>] [--clear]` | Show, set, or clear the auto-applied default. |
+| `dir [<path>]` | Show or persist the profiles directory. |
+
+Profile files are TOML, parsed with the standard library `tomllib`, which executes no code. They are validated against a closed schema and bounded in size and count, so a hand-edited or hostile file cannot run code or crash a run.
+
 ## Running via uv
 
 The CLI is registered as a `[project.scripts]` entry point, so both forms work:

@@ -29,4 +29,6 @@ You can expect an acknowledgement within 7 days and a substantive response with 
 
 This project's threat model centres on the security guarantees the scanner provides, specifically that recursive enumeration cannot escape the user-supplied root via symbolic links or NTFS directory junctions. Reports relevant to that contract take priority.
 
+The CLI also reads saved profiles from per-user TOML files. Those files are parsed with the standard library `tomllib` (which executes no code), validated against a closed five-field schema, and bounded in size and count; the profile name is validated before it becomes a filename, and symlinked or non-regular files in the profiles directory are ignored. The trust boundary is the user's own account: this hardening targets corrupt, oversized, symlinked, or hand-edited files and traversal via a profile name, not an attacker who can already write to the user's configuration directory.
+
 Out of scope: vulnerabilities in upstream dependencies (Polars, Rich, Loguru, etc.).  Please report those to the respective projects. We will track and uptake fixes as they ship.
