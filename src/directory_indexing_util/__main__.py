@@ -396,7 +396,8 @@ def _save_captured_profile(args: argparse.Namespace, profiles_dir: Path) -> None
     except config.ConfigError as exc:
         logger.error("{}", exc)
         raise SystemExit(1) from exc
-    logger.info("{} profile {!r}.", "Updated" if existed else "Saved", config._require_name(name))
+    verb = "Replaced" if existed else "Saved"
+    logger.info("{} profile {!r}.", verb, config._require_name(name))
 
 
 def _cmd_scan(args: argparse.Namespace) -> None:
@@ -543,13 +544,20 @@ def _cmd_profile_show(args: argparse.Namespace) -> None:
     print(f"{config._require_name(args.name)}: {_profile_flags(profile) or '(no settings)'}")
 
 
-def _cmd_profile_save(args: argparse.Namespace) -> None:
-    """Execute ``profile save``: create or update a profile from flags."""
-    from loguru import logger  # noqa: PLC0415 - lazy
+def _fields_from_args(args: argparse.Namespace) -> dict[str, object]:
+    """Build a profile-field mapping from the how-flags the user supplied.
 
-    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed ``profile save`` or ``profile update`` arguments.
 
-    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+    Returns
+    -------
+    dict
+        Only the fields the user passed (``-a``, ``-w``, ``-f``, and the
+        ``-i``/``-x`` filter); unset options are omitted.
+    """
     fields: dict[str, object] = {}
     for dest in ("algorithm", "workers", "format"):
         value = getattr(args, dest, _UNSET)
@@ -561,14 +569,48 @@ def _cmd_profile_save(args: argparse.Namespace) -> None:
         fields["mode"], fields["ext"] = "whitelist", include
     elif exclude is not _UNSET and exclude:
         fields["mode"], fields["ext"] = "blacklist", exclude
+    return fields
+
+
+def _cmd_profile_save(args: argparse.Namespace) -> None:
+    """Execute ``profile save``: define a profile as exactly the given flags."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
     try:
         existed = config._resolve_profile_file(args.name, profiles_dir=profiles_dir) is not None
-        config._save_profile(args.name, fields, profiles_dir=profiles_dir)
+        config._save_profile(args.name, _fields_from_args(args), profiles_dir=profiles_dir)
     except config.ConfigError as exc:
         logger.error("{}", exc)
         raise SystemExit(1) from exc
-    verb = "Updated" if existed else "Saved"
+    verb = "Replaced" if existed else "Saved"
     logger.info("{} profile {!r}.", verb, config._require_name(args.name))
+
+
+def _cmd_profile_update(args: argparse.Namespace) -> None:
+    """Execute ``profile update``: change fields of an existing profile, keeping the rest."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+    try:
+        profile = config._get_profile(args.name, profiles_dir=profiles_dir)
+    except KeyError:
+        logger.error("No such profile: {}", args.name)
+        raise SystemExit(1) from None
+    except config.ConfigError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
+    merged = {**profile, **_fields_from_args(args)}
+    try:
+        config._save_profile(args.name, merged, profiles_dir=profiles_dir)
+    except config.ConfigError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
+    logger.info("Updated profile {!r}.", config._require_name(args.name))
 
 
 def _cmd_profile_delete(args: argparse.Namespace) -> None:
@@ -753,13 +795,21 @@ def _add_profile_subcommand(sub: argparse._SubParsersAction) -> None:
     _add_profiles_dir_arg(show)
     show.set_defaults(func=_cmd_profile_show)
 
-    save = actions.add_parser("save", help="Create or update a profile from flags.")
+    save = actions.add_parser("save", help="Create or replace a profile from flags.")
     save.add_argument("name")
     _add_hash_args(save)
     _add_filter_args(save)
     _add_format_arg(save)
     _add_profiles_dir_arg(save)
     save.set_defaults(func=_cmd_profile_save)
+
+    update = actions.add_parser("update", help="Change fields of an existing profile.")
+    update.add_argument("name")
+    _add_hash_args(update)
+    _add_filter_args(update)
+    _add_format_arg(update)
+    _add_profiles_dir_arg(update)
+    update.set_defaults(func=_cmd_profile_update)
 
     delete = actions.add_parser("delete", help="Delete a profile.")
     delete.add_argument("name")
