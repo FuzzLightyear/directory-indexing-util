@@ -483,6 +483,170 @@ def _cmd_index(args: argparse.Namespace) -> None:
     _save_captured_profile(args, profiles_dir)
 
 
+def _profile_flags(profile: dict[str, object]) -> str:
+    """Render a profile as the ``dirindex`` flags that reproduce it.
+
+    Parameters
+    ----------
+    profile : dict
+        Validated profile fields.
+
+    Returns
+    -------
+    str
+        A space-joined flag string (empty for a profile with no settings).
+    """
+    parts: list[str] = []
+    if profile.get("algorithm"):
+        parts += ["-a", str(profile["algorithm"])]
+    if profile.get("workers") is not None:
+        parts += ["-w", str(profile["workers"])]
+    if profile.get("format"):
+        parts += ["-f", str(profile["format"])]
+    mode, ext = profile.get("mode"), profile.get("ext")
+    if mode and ext:
+        parts += ["-i" if mode == "whitelist" else "-x", ",".join(ext)]
+    return " ".join(parts)
+
+
+def _cmd_profile_list(args: argparse.Namespace) -> None:
+    """Execute ``profile list``: print profile names, marking the default."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+    names = config._list_profiles(profiles_dir)
+    if not names:
+        logger.info("No profiles in {}.", profiles_dir)
+        return
+    default = config._get_default()
+    for name in names:
+        print(f"{name} (default)" if name == default else name)
+
+
+def _cmd_profile_show(args: argparse.Namespace) -> None:
+    """Execute ``profile show``: print a profile's settings as flags."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+    try:
+        profile = config._get_profile(args.name, profiles_dir=profiles_dir)
+    except KeyError:
+        logger.error("No such profile: {}", args.name)
+        raise SystemExit(1) from None
+    except config.ConfigError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
+    print(f"{config._require_name(args.name)}: {_profile_flags(profile) or '(no settings)'}")
+
+
+def _cmd_profile_save(args: argparse.Namespace) -> None:
+    """Execute ``profile save``: create or update a profile from flags."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+    fields: dict[str, object] = {}
+    for dest in ("algorithm", "workers", "format"):
+        value = getattr(args, dest, _UNSET)
+        if value is not _UNSET:
+            fields[dest] = value
+    include = getattr(args, "include", _UNSET)
+    exclude = getattr(args, "exclude", _UNSET)
+    if include is not _UNSET and include:
+        fields["mode"], fields["ext"] = "whitelist", include
+    elif exclude is not _UNSET and exclude:
+        fields["mode"], fields["ext"] = "blacklist", exclude
+    try:
+        existed = config._resolve_profile_file(args.name, profiles_dir=profiles_dir) is not None
+        config._save_profile(args.name, fields, profiles_dir=profiles_dir)
+    except config.ConfigError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
+    verb = "Updated" if existed else "Saved"
+    logger.info("{} profile {!r}.", verb, config._require_name(args.name))
+
+
+def _cmd_profile_delete(args: argparse.Namespace) -> None:
+    """Execute ``profile delete``: remove a profile and print how to recover it."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+    try:
+        profile = config._get_profile(args.name, profiles_dir=profiles_dir)
+    except KeyError:
+        logger.error("No such profile: {}", args.name)
+        raise SystemExit(1) from None
+    except config.ConfigError:
+        profile = {}
+
+    name = config._require_name(args.name)
+    was_default = config._get_default() == name
+    config._delete_profile(args.name, profiles_dir=profiles_dir)
+
+    recover = f"dirindex profile save {name} {_profile_flags(profile)}".rstrip()
+    message = f"Deleted profile {name!r}. Recover with: {recover}"
+    if was_default:
+        message += " (it was the default, now cleared)"
+    logger.info(message)
+
+
+def _cmd_profile_default(args: argparse.Namespace) -> None:
+    """Execute ``profile default``: show, set, or clear the default profile."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    if args.clear:
+        config._set_default(None)
+        logger.info("Default profile cleared.")
+        return
+    if args.name is None:
+        default = config._get_default()
+        print(default if default else "(none)")
+        return
+    profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+    try:
+        if config._resolve_profile_file(args.name, profiles_dir=profiles_dir) is None:
+            logger.error("No such profile: {}", args.name)
+            raise SystemExit(1) from None
+        config._set_default(args.name)
+    except config.ConfigError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
+    logger.info("Default profile set to {!r}.", config._require_name(args.name))
+
+
+def _cmd_profile_dir(args: argparse.Namespace) -> None:
+    """Execute ``profile dir``: show or persist the profiles directory."""
+    from loguru import logger  # noqa: PLC0415 - lazy
+
+    from directory_indexing_util import config  # noqa: PLC0415 - lazy
+
+    if args.path is None:
+        print(config._profiles_dir())
+        return
+    config._set_profiles_dir(args.path)
+    logger.info("Profiles directory set to {}.", config._profiles_dir())
+
+
+def _add_format_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the shared ``-f/--format`` option to *parser*."""
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=_FORMATS,
+        default=_UNSET,
+        help=f"Output file format (default: {_DEFAULT_FORMAT}).",
+    )
+
+
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
     """Add the shared ``-o/--output`` and ``-f/--format`` options to *parser*."""
     parser.add_argument(
@@ -494,13 +658,7 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
             "Defaults to the current working directory."
         ),
     )
-    parser.add_argument(
-        "-f",
-        "--format",
-        choices=_FORMATS,
-        default=_UNSET,
-        help=f"Output file format (default: {_DEFAULT_FORMAT}).",
-    )
+    _add_format_arg(parser)
 
 
 def _add_filter_args(parser: argparse.ArgumentParser) -> None:
@@ -557,6 +715,15 @@ def _add_hash_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_profiles_dir_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the shared ``--profiles-dir`` override to *parser*."""
+    parser.add_argument(
+        "--profiles-dir",
+        metavar="DIR",
+        help="Directory holding profile files, overriding the configured location.",
+    )
+
+
 def _add_profile_args(parser: argparse.ArgumentParser) -> None:
     """Add ``--profile``, ``--save-profile``, and ``--profiles-dir`` to *parser*."""
     parser.add_argument(
@@ -569,11 +736,45 @@ def _add_profile_args(parser: argparse.ArgumentParser) -> None:
         metavar="NAME",
         help="Save the run's resolved settings as a profile of this name.",
     )
-    parser.add_argument(
-        "--profiles-dir",
-        metavar="DIR",
-        help="Directory holding profile files, overriding the configured location.",
-    )
+    _add_profiles_dir_arg(parser)
+
+
+def _add_profile_subcommand(sub: argparse._SubParsersAction) -> None:
+    """Add the ``profile`` subcommand group: list, show, save, delete, default, dir."""
+    profile = sub.add_parser("profile", help="Create, inspect, and manage saved profiles.")
+    actions = profile.add_subparsers(dest="profile_action", metavar="ACTION", required=True)
+
+    listing = actions.add_parser("list", help="List saved profiles.")
+    _add_profiles_dir_arg(listing)
+    listing.set_defaults(func=_cmd_profile_list)
+
+    show = actions.add_parser("show", help="Show a profile's settings.")
+    show.add_argument("name")
+    _add_profiles_dir_arg(show)
+    show.set_defaults(func=_cmd_profile_show)
+
+    save = actions.add_parser("save", help="Create or update a profile from flags.")
+    save.add_argument("name")
+    _add_hash_args(save)
+    _add_filter_args(save)
+    _add_format_arg(save)
+    _add_profiles_dir_arg(save)
+    save.set_defaults(func=_cmd_profile_save)
+
+    delete = actions.add_parser("delete", help="Delete a profile.")
+    delete.add_argument("name")
+    _add_profiles_dir_arg(delete)
+    delete.set_defaults(func=_cmd_profile_delete)
+
+    default = actions.add_parser("default", help="Show, set, or clear the default profile.")
+    default.add_argument("name", nargs="?")
+    default.add_argument("--clear", action="store_true", help="Clear the default profile.")
+    _add_profiles_dir_arg(default)
+    default.set_defaults(func=_cmd_profile_default)
+
+    directory = actions.add_parser("dir", help="Show or set the profiles directory.")
+    directory.add_argument("path", nargs="?")
+    directory.set_defaults(func=_cmd_profile_dir)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -626,6 +827,8 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_hash_args(index_cmd)
     _add_profile_args(index_cmd)
     index_cmd.set_defaults(func=_cmd_index)
+
+    _add_profile_subcommand(sub)
 
     return parser
 

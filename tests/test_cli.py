@@ -531,3 +531,67 @@ def test_unknown_profile_exits_one(profiles_env: Path, tmp_path: Path) -> None:
     )
     assert result.returncode == 1
     assert "No such profile" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# profile subcommand
+# ---------------------------------------------------------------------------
+
+
+def test_profile_save_show_list_delete(profiles_env: Path) -> None:
+    """The save, list, show, delete cycle works and delete prints a recovery hint."""
+    save = _run("profile", "save", "code", "-a", "sha512", "-i", "py", "-f", "json")
+    assert "Saved profile" in save.stderr
+
+    assert "code" in _run("profile", "list").stdout
+
+    show = _run("profile", "show", "code")
+    assert "-a sha512" in show.stdout
+    assert "-i py" in show.stdout
+
+    deleted = _run("profile", "delete", "code")
+    assert "Recover with: dirindex profile save code" in deleted.stderr
+    assert _run("profile", "list").stdout.strip() == ""
+
+
+def test_profile_second_save_reports_update(profiles_env: Path) -> None:
+    """Saving an existing profile name reports Updated, not Saved."""
+    assert "Saved profile" in _run("profile", "save", "p", "-a", "sha256").stderr
+    assert "Updated profile" in _run("profile", "save", "p", "-a", "sha512").stderr
+
+
+def test_profile_default_set_query_clear(profiles_env: Path) -> None:
+    """A default can be set, queried, marked in the listing, and cleared."""
+    _run("profile", "save", "p", "-a", "sha256")
+    _run("profile", "default", "p")
+    assert _run("profile", "default").stdout.strip() == "p"
+    assert "(default)" in _run("profile", "list").stdout
+    _run("profile", "default", "--clear")
+    assert _run("profile", "default").stdout.strip() == "(none)"
+
+
+def test_profile_default_unknown_exits_one(profiles_env: Path) -> None:
+    """Defaulting to a profile that does not exist fails with exit code 1."""
+    result = _run("profile", "default", "ghost", check=False)
+    assert result.returncode == 1
+
+
+def test_profile_delete_missing_exits_one(profiles_env: Path) -> None:
+    """Deleting a profile that does not exist fails with exit code 1."""
+    result = _run("profile", "delete", "ghost", check=False)
+    assert result.returncode == 1
+
+
+def test_profile_requires_an_action(profiles_env: Path) -> None:
+    """``dirindex profile`` with no action is rejected by argparse (exit code 2)."""
+    result = _run("profile", check=False)
+    assert result.returncode == 2
+
+
+def test_profile_dir_set_and_query(monkeypatch, tmp_path: Path) -> None:
+    """``profile dir <path>`` persists the location and ``profile dir`` reads it back."""
+    monkeypatch.setenv("DIRINDEX_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.delenv("DIRINDEX_PROFILES_DIR", raising=False)
+    target = tmp_path / "custom-profiles"
+    _run("profile", "dir", str(target))
+    assert str(target.resolve()) in _run("profile", "dir").stdout
