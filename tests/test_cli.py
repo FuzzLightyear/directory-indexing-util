@@ -444,3 +444,90 @@ def test_include_and_exclude_are_mutually_exclusive(tmp_path: Path) -> None:
     result = _run("scan", str(tmp_path), "-i", "py", "-x", "tmp", check=False)
     assert result.returncode == 2
     assert "not allowed with" in result.stderr.lower()
+
+
+# ---------------------------------------------------------------------------
+# Profiles end-to-end
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def profiles_env(monkeypatch, tmp_path: Path) -> Path:
+    """Point the CLI's config and profiles at a temp dir (inherited by subprocesses)."""
+    monkeypatch.setenv("DIRINDEX_CONFIG_DIR", str(tmp_path / "config"))
+    profiles = tmp_path / "profiles"
+    monkeypatch.setenv("DIRINDEX_PROFILES_DIR", str(profiles))
+    return profiles
+
+
+def test_save_then_apply_profile(profiles_env: Path, tmp_path: Path) -> None:
+    """A profile saved from one run applies its algorithm and filter to another."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "keep.py").write_bytes(b"x")
+    (src / "drop.txt").write_bytes(b"x")
+
+    saved = _run(
+        "index",
+        str(src),
+        "-i",
+        "py",
+        "-a",
+        "sha512",
+        "--save-profile",
+        "code",
+        "-o",
+        str(tmp_path / "first.parquet"),
+    )
+    assert "Saved profile" in saved.stderr
+    assert (profiles_env / "code.toml").is_file()
+
+    out = tmp_path / "second.json"
+    _run("index", str(src), "--profile", "code", "-f", "json", "-o", str(out))
+    manifest = json.loads(out.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    assert manifest["hash_algorithm"] == "sha512"
+    assert manifest["file_count"] == 1
+
+
+def test_explicit_flag_overrides_applied_profile(profiles_env: Path, tmp_path: Path) -> None:
+    """An explicit ``-a`` on the run overrides the applied profile's algorithm."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    _run(
+        "index", str(src), "-a", "sha512", "--save-profile", "p", "-o", str(tmp_path / "a.parquet")
+    )
+    out = tmp_path / "b.parquet"
+    _run("index", str(src), "--profile", "p", "-a", "md5", "-o", str(out))
+    manifest = json.loads(out.with_suffix(".meta.json").read_text(encoding="utf-8"))
+    assert manifest["hash_algorithm"] == "md5"
+
+
+def test_save_profile_reports_created_then_updated(profiles_env: Path, tmp_path: Path) -> None:
+    """The first ``--save-profile`` says Saved; a second one says Updated."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    first = _run(
+        "index", str(src), "-a", "sha256", "--save-profile", "p", "-o", str(tmp_path / "1.parquet")
+    )
+    assert "Saved profile" in first.stderr
+    second = _run(
+        "index", str(src), "-a", "sha512", "--save-profile", "p", "-o", str(tmp_path / "2.parquet")
+    )
+    assert "Updated profile" in second.stderr
+
+
+def test_unknown_profile_exits_one(profiles_env: Path, tmp_path: Path) -> None:
+    """``--profile`` naming nothing exits 1 with a clear message."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    result = _run(
+        "index", str(src), "--profile", "ghost", "-o", str(tmp_path / "x.parquet"), check=False
+    )
+    assert result.returncode == 1
+    assert "No such profile" in result.stderr
