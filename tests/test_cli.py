@@ -606,6 +606,13 @@ def test_profile_default_unknown_exits_one(profiles_env: Path) -> None:
     assert result.returncode == 1
 
 
+def test_profile_default_name_with_clear_is_rejected(profiles_env: Path) -> None:
+    """A name and --clear together are mutually exclusive (argparse exit code 2)."""
+    result = _run("profile", "default", "p", "--clear", check=False)
+    assert result.returncode == 2
+    assert "not allowed with" in result.stderr.lower()
+
+
 def test_profile_delete_missing_exits_one(profiles_env: Path) -> None:
     """Deleting a profile that does not exist fails with exit code 1."""
     result = _run("profile", "delete", "ghost", check=False)
