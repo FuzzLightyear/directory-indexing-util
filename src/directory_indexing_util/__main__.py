@@ -281,7 +281,7 @@ def _apply_filter(args: argparse.Namespace, profile: dict[str, object]) -> None:
     user_set = (has_inc and args.include is not _UNSET) or (has_exc and args.exclude is not _UNSET)
     if not user_set:
         mode, ext = profile.get("mode"), profile.get("ext")
-        if mode and ext:
+        if mode and isinstance(ext, list):
             joined = ",".join(ext)
             if mode == "whitelist" and has_inc:
                 args.include = joined
@@ -513,7 +513,7 @@ def _profile_flags(profile: dict[str, object]) -> str:
     if profile.get("format"):
         parts += ["-f", str(profile["format"])]
     mode, ext = profile.get("mode"), profile.get("ext")
-    if mode and ext:
+    if mode and isinstance(ext, list):
         parts += ["-i" if mode == "whitelist" else "-x", ",".join(ext)]
     return " ".join(parts)
 
