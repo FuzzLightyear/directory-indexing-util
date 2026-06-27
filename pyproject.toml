@@ -63,6 +63,7 @@ dev = [
     "pytest==9.0.3",
     "ruff==0.15.13",
     "pre-commit==4.6.0",
+    "mypy==1.19.1",
 ]
 blake3 = [
     "blake3==1.0.8",
@@ -91,3 +92,14 @@ ignore = ["S603", "S607"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["polars.*", "loguru.*", "blake3.*"]
+ignore_missing_imports = true
