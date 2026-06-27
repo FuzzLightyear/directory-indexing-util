@@ -121,7 +121,8 @@ class _RichIterator(Generic[T]):
         except StopIteration:
             self.close()
             raise
-        self._progress.update(self._task_id, advance=1)
+        if self._task_id is not None:
+            self._progress.update(self._task_id, advance=1)
         return item
 
 
