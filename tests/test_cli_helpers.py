@@ -352,6 +352,12 @@ def test_apply_config_rejects_out_of_range_workers(cfg: Path) -> None:
         _apply_config(_index_ns(workers=10**6))
 
 
+def test_apply_config_rejects_invalid_save_profile_name(cfg: Path) -> None:
+    """An invalid --save-profile name exits before the run does any work."""
+    with pytest.raises(SystemExit):
+        _apply_config(_index_ns(save_profile="bad name"))
+
+
 def test_save_captured_profile_records_resolved_settings(cfg: Path) -> None:
     """--save-profile persists the resolved how, mapping include to mode and ext."""
     pdir = config._profiles_dir()

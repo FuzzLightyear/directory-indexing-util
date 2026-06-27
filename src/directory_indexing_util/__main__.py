@@ -315,14 +315,22 @@ def _apply_config(args: argparse.Namespace) -> Path:
     Raises
     ------
     SystemExit
-        If ``--profile`` names no profile or is invalid, or ``--workers`` is
-        out of range.
+        If ``--profile`` names no profile or is invalid, ``--save-profile`` is
+        not a valid profile name, or ``--workers`` is out of range.
     """
     from loguru import logger  # noqa: PLC0415 - lazy
 
     from directory_indexing_util import config  # noqa: PLC0415 - lazy
 
     profiles_dir = config._profiles_dir(getattr(args, "profiles_dir", None))
+
+    save_name = getattr(args, "save_profile", None)
+    if save_name:
+        try:
+            config._require_name(save_name)
+        except config.ConfigError as exc:
+            logger.error("{}", exc)
+            raise SystemExit(1) from exc
 
     name = getattr(args, "profile", None)
     if name:
