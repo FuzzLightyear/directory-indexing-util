@@ -533,6 +533,19 @@ def test_unknown_profile_exits_one(profiles_env: Path, tmp_path: Path) -> None:
     assert "No such profile" in result.stderr
 
 
+def test_save_profile_invalid_name_fails_before_writing(profiles_env: Path, tmp_path: Path) -> None:
+    """An invalid --save-profile name exits 1 without scanning or writing output."""
+    src = tmp_path / "data"
+    src.mkdir()
+    (src / "a.bin").write_bytes(b"x")
+
+    out = tmp_path / "out.parquet"
+    result = _run("index", str(src), "--save-profile", "bad name", "-o", str(out), check=False)
+    assert result.returncode == 1
+    assert "Invalid profile name" in result.stderr
+    assert not out.exists()
+
+
 # ---------------------------------------------------------------------------
 # profile subcommand
 # ---------------------------------------------------------------------------
