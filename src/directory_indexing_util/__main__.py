@@ -825,8 +825,9 @@ def _add_profile_subcommand(sub: argparse._SubParsersAction) -> None:
     delete.set_defaults(func=_cmd_profile_delete)
 
     default = actions.add_parser("default", help="Show, set, or clear the default profile.")
-    default.add_argument("name", nargs="?")
-    default.add_argument("--clear", action="store_true", help="Clear the default profile.")
+    target = default.add_mutually_exclusive_group()
+    target.add_argument("name", nargs="?")
+    target.add_argument("--clear", action="store_true", help="Clear the default profile.")
     _add_profiles_dir_arg(default)
     default.set_defaults(func=_cmd_profile_default)
 
