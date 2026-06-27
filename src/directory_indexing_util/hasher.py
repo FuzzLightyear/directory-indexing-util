@@ -11,6 +11,7 @@ import os
 import stat
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 import polars as pl
 
@@ -42,7 +43,7 @@ def _is_non_local_path(path: str) -> bool:
     return path[:2] in ("\\\\", "//")
 
 
-def _digest_factory(algorithm: str) -> str | Callable[[], object]:
+def _digest_factory(algorithm: str) -> str | Callable[[], Any]:
     """Return the digest argument for :func:`hashlib.file_digest`.
 
     Parameters
@@ -63,7 +64,7 @@ def _digest_factory(algorithm: str) -> str | Callable[[], object]:
     return algorithm
 
 
-def _hash_file(path: str, digest: str | Callable[[], object]) -> str | None:
+def _hash_file(path: str, digest: str | Callable[[], Any]) -> str | None:
     """Compute a hex digest of *path*.
 
     Parameters
