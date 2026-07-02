@@ -40,3 +40,6 @@ htmlcov/
 # Research artifacts (raw data, not results)
 research/benchmarks/_test_data*/
 research/benchmarks/*.parquet
+
+# Local-only verification scripts (visual/manual checks, not benchmarks)
+research/benchmarks/verify_*.py
