@@ -1,0 +1,11 @@
+# Monthly grouped action bumps keep the SHA pins fresh with one PR at a time.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"
