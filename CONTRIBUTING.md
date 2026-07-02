@@ -34,11 +34,12 @@ Run the test suite:
 uv run pytest
 ```
 
-Run the linters manually (pre-commit does this automatically on commit):
+Run the linters and type checker manually (pre-commit runs the ruff hooks on every commit; CI runs all gates, plus the test suite and a dependency audit, on every pull request):
 
 ```bash
 uv run ruff check
 uv run ruff format --check
+uv run mypy
 ```
 
 Reproduce the research benchmarks:
