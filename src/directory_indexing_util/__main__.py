@@ -449,7 +449,11 @@ def _cmd_hash(args: argparse.Namespace) -> None:
         logger.error("Input file missing required 'file_path' column.")
         raise SystemExit(1)
 
-    df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
+    try:
+        df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
+    except ValueError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
 
     _emit(
         console,
@@ -465,6 +469,7 @@ def _cmd_hash(args: argparse.Namespace) -> None:
 
 def _cmd_index(args: argparse.Namespace) -> None:
     """Execute the ``index`` subcommand: scan + hash in a single pass."""
+    from loguru import logger  # noqa: PLC0415 - lazy
     from rich.console import Console  # noqa: PLC0415 - lazy
 
     from directory_indexing_util.hasher import hash_dataframe  # noqa: PLC0415
@@ -478,7 +483,11 @@ def _cmd_index(args: argparse.Namespace) -> None:
     exclude = _parse_extensions(args.exclude)
 
     df = _scan_with_status(console, root, include, exclude)
-    df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
+    try:
+        df = hash_dataframe(df, algorithm=args.algorithm, workers=args.workers, desc="Hashing")
+    except ValueError as exc:
+        logger.error("{}", exc)
+        raise SystemExit(1) from exc
 
     _emit(
         console,
