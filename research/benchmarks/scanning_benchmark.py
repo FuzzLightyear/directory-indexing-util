@@ -53,13 +53,6 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
 
-try:
-    from tqdm import tqdm
-
-    HAS_TQDM = True
-except ImportError:
-    HAS_TQDM = False
-
 RUNS_PER_STRATEGY = 3
 
 
@@ -75,11 +68,7 @@ def _os_walk(root: str, *, progress: bool) -> list[str]:
 def _os_walk_comprehension(root: str, *, progress: bool) -> list[str]:
     """One-liner ``os.walk`` via set comprehension."""
     return list(
-        {
-            os.path.join(dirpath, f)
-            for dirpath, _, filenames in os.walk(root)
-            for f in filenames
-        }
+        {os.path.join(dirpath, f) for dirpath, _, filenames in os.walk(root) for f in filenames}
     )
 
 
@@ -160,7 +149,7 @@ def _scandir_gen_explicit_inner(directory: str) -> Generator[str]:
                 if item.is_file(follow_symlinks=False):
                     yield item.path
                 elif item.is_dir(follow_symlinks=False):
-                    for subitem in _scandir_gen_explicit_inner(item.path):
+                    for subitem in _scandir_gen_explicit_inner(item.path):  # noqa: UP028
                         yield subitem
     except PermissionError:
         return
@@ -334,11 +323,12 @@ def warmup(strategies: list[tuple[str, Callable, str, str]], root: str) -> None:
         Directory to scan.
     """
     for _, fn, _, _ in strategies:
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            try:
-                fn(root, progress=False)
-            except Exception:
-                pass
+        with (
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+            contextlib.suppress(Exception),
+        ):
+            fn(root, progress=False)
 
 
 def run_all(target_dir: Path) -> pl.DataFrame:
@@ -388,23 +378,22 @@ def run_all(target_dir: Path) -> pl.DataFrame:
         mean = sum(times) / len(times)
         match = "OK" if count == truth_count else f"MISMATCH({count})"
 
-        print(
-            f"best={best:.5f}s  median={median:.5f}s  mean={mean:.5f}s  "
-            f"[{count} files] {match}"
-        )
+        print(f"best={best:.5f}s  median={median:.5f}s  mean={mean:.5f}s  [{count} files] {match}")
 
-        rows.append({
-            "strategy": name,
-            "dep_tier": tier,
-            "source": source,
-            "best_s": round(best, 5),
-            "median_s": round(median, 5),
-            "mean_s": round(mean, 5),
-            "files_found": count,
-            "expected": truth_count,
-            "correct": count == truth_count,
-            "runs": RUNS_PER_STRATEGY,
-        })
+        rows.append(
+            {
+                "strategy": name,
+                "dep_tier": tier,
+                "source": source,
+                "best_s": round(best, 5),
+                "median_s": round(median, 5),
+                "mean_s": round(mean, 5),
+                "files_found": count,
+                "expected": truth_count,
+                "correct": count == truth_count,
+                "runs": RUNS_PER_STRATEGY,
+            }
+        )
 
     return pl.DataFrame(rows)
 
@@ -468,9 +457,7 @@ def print_results(df: pl.DataFrame) -> None:
         subset = df.filter(pl.col("strategy").is_in(names)).sort("best_s")
         if subset.height:
             best_row = subset.row(0, named=True)
-            print(
-                f"  {cat:<30}  winner: {best_row['strategy']:<27} {best_row['best_s']:.5f}s"
-            )
+            print(f"  {cat:<30}  winner: {best_row['strategy']:<27} {best_row['best_s']:.5f}s")
 
 
 def main():
@@ -482,7 +469,12 @@ def main():
             sys.exit(1)
         targets = [("user-provided", target)]
     else:
-        from generate_test_data import DEFAULT_OUTPUT_DIR, DEEP_OUTPUT_DIR, generate_deep, generate_flat
+        from generate_test_data import (
+            DEEP_OUTPUT_DIR,
+            DEFAULT_OUTPUT_DIR,
+            generate_deep,
+            generate_flat,
+        )
 
         print("No directory given — generating synthetic test data...")
         n1 = generate_flat()
