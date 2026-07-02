@@ -97,7 +97,7 @@ def _hash_file(path: str, digest: str | Callable[[], Any]) -> str | None:
             return None
         with open(path, "rb") as f:  # noqa: S324 - algorithm is caller-validated
             return hashlib.file_digest(f, digest).hexdigest()
-    except (PermissionError, OSError):
+    except OSError:
         return None
 
 

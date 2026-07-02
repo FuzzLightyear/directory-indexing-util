@@ -262,6 +262,17 @@ def test_hash_missing_input_file_fails(tmp_path: Path) -> None:
     assert result.returncode == 1
 
 
+def test_hash_non_string_file_path_column_fails_cleanly(tmp_path: Path) -> None:
+    """A ``file_path`` column of the wrong dtype exits 1 with an error, not a traceback."""
+    bad = tmp_path / "scan.csv"
+    bad.write_text("file_path\n1\n2\n", encoding="utf-8")
+
+    result = _run("hash", str(bad), "-o", str(tmp_path / "out.parquet"), check=False)
+    assert result.returncode == 1
+    assert "Utf8" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 @pytest.mark.parametrize("algorithm", ["sha256", "sha512", "blake2b", "md5"])
 def test_hash_with_each_algorithm(tmp_path: Path, algorithm: str) -> None:
     """The ``-a`` flag exercises each supported algorithm end-to-end."""

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Continuous integration. Every pull request and push to main runs the full quality gate on GitHub Actions: ruff lint and format checks, mypy, the test suite, and a `pip-audit` vulnerability scan of the exported lockfile. Actions are pinned to commit SHAs and refreshed monthly by Dependabot.
 - Configuration profiles. Save the *how* of a run (algorithm, workers, format, extension filter) as a named preset and reuse it with `--profile` on `scan`/`hash`/`index`, or capture it from a run with `--save-profile`. A `dirindex profile` subcommand lists, shows, saves (replace) or updates (merge), deletes, and sets a default; the profiles directory is settable via `dirindex profile dir`, `--profiles-dir`, or `$DIRINDEX_PROFILES_DIR`. Profiles are per-user TOML files parsed with the standard library `tomllib`, and explicit flags always override a profile.
 
+### Fixed
+
+- The `hash` and `index` commands report a rejected hashing input (a `file_path` column of the wrong type, or the blake3 backend missing) as a one-line error with exit code 1 instead of a Python traceback.
+
 ### Changed
 
 - All runtime and development dependencies are pinned to exact versions, and a hash-verified `uv.lock` is now committed, so installs are reproducible and tamper-evident. `pip-audit` reports no known vulnerabilities for the pinned set.
