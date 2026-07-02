@@ -4,9 +4,9 @@
 """Rich progress utilities with millisecond elapsed and items-per-second columns.
 
 Designed as a drop-in replacement for ``tqdm`` over arbitrary iterables.  The
-column layout was validated in the research benchmarks (see
-``research/benchmarks/verify_progress.py``) against ``ThreadPoolExecutor.map``
-and ``ThreadPoolExecutor + as_completed`` to confirm incremental bar advance.
+column layout was validated during research against ``ThreadPoolExecutor.map``
+and ``ThreadPoolExecutor + as_completed`` drivers to confirm the bar advances
+incrementally rather than jumping at completion.
 """
 
 from __future__ import annotations

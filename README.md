@@ -8,7 +8,7 @@ A performant, security-minded utility for recursively walking directory trees, h
 
 Designed for two primary use cases:
 1. **Full index**: enumerate files and compute content hashes for deduplication or integrity verification.
-2. **Collection only**: enumerate files and metadata without hashing.
+2. **Collection only**: enumerate files without computing hashes.
 
 > **Maintenance status:** Personal project, casually maintained. **Issues are welcome** for bugs and feature requests. **External pull requests are not accepted**.  Fork freely under MIT for your own changes. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -127,7 +127,7 @@ Every `hash` or `index` invocation also writes a JSON manifest beside the data f
 | `command` | Subcommand that produced the output (`"hash"` or `"index"`). |
 | `input_path` | Absolute path of the input: scan file for `hash`, source directory for `index`. |
 | `output_path` | Data file written alongside this manifest. |
-| `hash_algorithm` | Algorithm used (`sha256`, `sha512`, `blake2b`, `md5`). |
+| `hash_algorithm` | Algorithm used for the run (one of the recognized names, including `blake3`). |
 | `file_count` | Total rows in the produced index. |
 | `failed_count` | Subset of `file_count` whose `file_hash` is `null` (file unreadable at hash time). `0` when every file hashed cleanly. |
 | `created_at` | ISO 8601 UTC timestamp. |
@@ -236,9 +236,9 @@ The package ships inline type hints with a [PEP 561](https://peps.python.org/pep
 
 | Symbol | Kind | Purpose |
 |---|---|---|
-| `scan_directory(root, *, include=None)` | function | Recursively enumerate files into a DataFrame |
+| `scan_directory(root, *, include=None, exclude=None)` | function | Recursively enumerate files into a DataFrame |
 | `hash_dataframe(df, *, algorithm="sha256", workers=None, desc=None)` | function | Hash files referenced by a DataFrame's `file_path` column |
-| `index_directory(root, *, algorithm="sha256", include=None, workers=None, desc=None)` | function | Scan + hash in one call |
+| `index_directory(root, *, algorithm="sha256", include=None, exclude=None, workers=None, desc=None)` | function | Scan + hash in one call |
 | `ALGORITHMS` | tuple[str, ...] | Tuple of supported hash algorithm names |
 | `DEFAULT_ALGORITHM` | str | Default algorithm (`"sha256"`) |
 | `__version__` | str | Installed package version |
@@ -267,10 +267,7 @@ Notable cross-platform considerations the package already handles:
 | `pytest` | Unit testing |
 | `loguru` | Structured logging |
 | `ruff` | Linting and formatting |
-
-### Future
-
-- `mypyc` compilation for hot-path acceleration (stdlib-only design enables this)
+| `mypy` | Static type checking |
 
 ## Project Structure
 
@@ -279,6 +276,8 @@ src/directory_indexing_util/
     __init__.py         Public API and __version__
     __main__.py         CLI entry point (dirindex)
     _algorithms.py      Stdlib-only hash algorithm constants
+    config.py           Per-user config directory and the saved-profile store
+    formats.py          Output-path resolution, format-aware I/O, run manifest
     scanner.py          Iterative os.scandir directory traversal
     hasher.py           Parallel file hashing (ThreadPoolExecutor + hashlib.file_digest)
     progress.py         Rich progress utilities (ms-precision elapsed, it/s)

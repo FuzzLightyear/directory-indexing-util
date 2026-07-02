@@ -31,8 +31,8 @@ Examples
 --------
 .. code-block:: bash
 
-    uv run --group research research/benchmarks/scanning_benchmark.py
-    uv run --group research research/benchmarks/scanning_benchmark.py /path/to/scan
+    uv run --extra research research/benchmarks/scanning_benchmark.py
+    uv run --extra research research/benchmarks/scanning_benchmark.py /path/to/scan
 """
 
 from __future__ import annotations
