@@ -34,9 +34,14 @@ from directory_indexing_util.__main__ import (
 )
 
 
-def _ns(output: str | None, fmt: str = _DEFAULT_FORMAT) -> argparse.Namespace:
+def _ns(
+    output: str | None,
+    fmt: str = _DEFAULT_FORMAT,
+    *,
+    explicit: bool = False,
+) -> argparse.Namespace:
     """Build a minimal Namespace with the fields ``_infer_format`` reads."""
-    return argparse.Namespace(output=output, format=fmt)
+    return argparse.Namespace(output=output, format=fmt, format_explicit=explicit)
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +80,20 @@ def test_infer_format_unknown_extension_keeps_format(tmp_path: Path) -> None:
 def test_infer_format_explicit_non_default_wins(tmp_path: Path) -> None:
     """An explicit ``-f json`` is respected even when ``-o report.csv``."""
     target = tmp_path / "report.csv"
-    assert _infer_format(_ns(output=str(target), fmt="json")) == "json"
+    assert _infer_format(_ns(output=str(target), fmt="json", explicit=True)) == "json"
+
+
+def test_infer_format_explicit_default_wins(tmp_path: Path) -> None:
+    """An explicit ``-f parquet`` is respected even though it names the default."""
+    target = tmp_path / "report.csv"
+    ns = _ns(output=str(target), fmt=_DEFAULT_FORMAT, explicit=True)
+    assert _infer_format(ns) == _DEFAULT_FORMAT
+
+
+def test_infer_format_extension_beats_profile_format(tmp_path: Path) -> None:
+    """A profile-supplied format yields to the ``-o`` extension when ``-f`` is absent."""
+    target = tmp_path / "report.json"
+    assert _infer_format(_ns(output=str(target), fmt="csv")) == "json"
 
 
 def test_infer_format_extensionless_output_uses_default(tmp_path: Path) -> None:
