@@ -1,5 +1,9 @@
 # directory-indexing-util
 
+[![CI](https://github.com/FuzzLightyear/directory-indexing-util/actions/workflows/ci.yml/badge.svg)](https://github.com/FuzzLightyear/directory-indexing-util/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 A performant, security-minded utility for recursively walking directory trees, hashing files, and producing a structured index. Collects file paths and content hashes into a Polars DataFrame exportable as Parquet, CSV, JSON, or NDJSON.
 
 Designed for two primary use cases:
