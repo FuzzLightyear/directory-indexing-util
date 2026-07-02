@@ -23,8 +23,6 @@ Submit a private security advisory via the repository's [Security tab](https://g
 
 You can expect an acknowledgement within 7 days and a substantive response with a remediation plan within 30 days. Once a fix is available and released, the advisory will be published with credit to the reporter (unless anonymity is requested).
 
-> Private vulnerability reporting must be enabled once in the repository's *Settings → Security → Private vulnerability reporting*. If you cannot file an advisory because the feature isn't yet enabled, please open a public issue asking only that it be enabled, but withhold any vulnerability details until the private channel is available.
-
 ## Scope
 
 This project's threat model centres on the security guarantees the scanner provides, specifically that recursive enumeration cannot escape the user-supplied root via symbolic links or NTFS directory junctions. Reports relevant to that contract take priority.
