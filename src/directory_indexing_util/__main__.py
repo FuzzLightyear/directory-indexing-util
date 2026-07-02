@@ -66,29 +66,31 @@ def _get_version() -> str:
 def _infer_format(args: argparse.Namespace) -> str:
     """Determine the effective output format for a command invocation.
 
-    When the user supplied ``-o`` as a *file path* (not a directory) and
-    its extension is one of the recognised formats, that extension wins
-    over the argparse-default format, letting ``-o report.csv`` Just
-    Work without also requiring ``-f csv``.  An explicit ``-f`` (i.e.,
-    something other than the default) is always respected.
+    An explicit ``-f`` always wins, even when it names the default format.
+    Otherwise, when ``-o`` is a *file path* (not a directory) whose
+    extension is one of the recognised formats, that extension wins over a
+    profile-supplied or built-in format, letting ``-o report.csv`` Just
+    Work without also requiring ``-f csv``.
 
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed arguments.  Must have ``output`` (``str`` or ``None``)
-        and ``format`` (member of :data:`_FORMATS`) attributes.
+        Parsed arguments after :func:`_apply_config`.  Must have ``output``
+        (``str`` or ``None``), ``format`` (member of :data:`_FORMATS`), and
+        ``format_explicit`` (``bool``) attributes.
 
     Returns
     -------
     str
         Final format string (one of :data:`_FORMATS`).
     """
-    fmt = args.format
+    if getattr(args, "format_explicit", False):
+        return args.format
     if args.output and not Path(args.output).is_dir():
         suffix = Path(args.output).suffix.lstrip(".").lower()
-        if suffix in _FORMATS and fmt == _DEFAULT_FORMAT:
-            fmt = suffix
-    return fmt
+        if suffix in _FORMATS:
+            return suffix
+    return args.format
 
 
 def _parse_extensions(value: str | None) -> set[str] | None:
@@ -296,7 +298,8 @@ def _apply_filter(args: argparse.Namespace, profile: dict[str, object]) -> None:
 def _apply_config(args: argparse.Namespace) -> Path:
     """Resolve profile settings into *args* in place and return the profiles dir.
 
-    Loads ``--profile`` (or the configured default), fills each
+    Loads ``--profile`` (or the configured default), records whether ``-f``
+    was passed explicitly (so :func:`_infer_format` can honor it), fills each
     profile-overridable option the user did not pass, applies the extension
     filter under the mutual-exclusion guard, and bounds the worker count.  The
     config module is imported here, never at parse time, so the
@@ -352,6 +355,7 @@ def _apply_config(args: argparse.Namespace) -> Path:
             except (KeyError, config.ConfigError):
                 profile = {}
 
+    args.format_explicit = getattr(args, "format", _UNSET) is not _UNSET
     for dest in _OVERRIDABLE:
         if hasattr(args, dest) and getattr(args, dest) is _UNSET:
             setattr(args, dest, profile.get(dest, _BUILTIN_DEFAULTS[dest]))

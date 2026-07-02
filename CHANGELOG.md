@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Output-format inference from the `-o` extension now applies whenever `-f` is absent, where previously a profile-supplied format silently suppressed it, and an explicit `-f` is always respected even when it names the default format.
 - The `hash` and `index` commands report a rejected hashing input (a `file_path` column of the wrong type, or the blake3 backend missing) as a one-line error with exit code 1 instead of a Python traceback.
 
 ### Changed
