@@ -1,0 +1,51 @@
+# Quality gates: lint, format, types, tests, and a dependency audit.
+# Single Ubuntu job with a cached uv environment to keep billed minutes low.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Sync locked dependencies
+        run: uv sync --locked --extra dev --extra blake3
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Type-check
+        run: uv run mypy
+
+      - name: Test
+        run: uv run pytest -q
+
+      - name: Audit locked dependencies for known vulnerabilities
+        run: |
+          uv export --locked --all-extras --no-emit-project --format requirements-txt -o requirements-audit.txt
+          uvx pip-audit --disable-pip --no-deps -r requirements-audit.txt
