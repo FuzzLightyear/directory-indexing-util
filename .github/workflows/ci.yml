@@ -47,5 +47,5 @@ jobs:
 
       - name: Audit locked dependencies for known vulnerabilities
         run: |
-          uv export --locked --all-extras --no-emit-project --format requirements-txt -o requirements-audit.txt
+          uv export --locked --all-extras --group docs --no-emit-project --format requirements-txt -o requirements-audit.txt
           uvx pip-audit --disable-pip --no-deps -r requirements-audit.txt
