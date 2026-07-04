@@ -1,0 +1,82 @@
+# Build and deploy the documentation site to GitHub Pages.
+# Demo GIFs are rendered first from the VHS tapes against the real CLI,
+# so the published demos always match released behavior. Runs only on
+# pushes to main; Pages minutes are free for public repositories.
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Sync locked dependencies
+        run: uv sync --locked --extra blake3 --group docs
+
+      - name: Put the project environment on PATH for the demo tapes
+        run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Generate the synthetic demo tree
+        run: uv run python docs/demos/make_demo_tree.py
+
+      - name: Render the scan demo
+        uses: charmbracelet/vhs-action@59641cdc7fadf3978db65eb8c6937ea2752f4ec3 # v2.1.0
+        with:
+          path: docs/demos/scan.tape
+
+      - name: Render the index demo
+        uses: charmbracelet/vhs-action@59641cdc7fadf3978db65eb8c6937ea2752f4ec3 # v2.1.0
+        with:
+          path: docs/demos/index.tape
+
+      - name: Render the profiles demo
+        uses: charmbracelet/vhs-action@59641cdc7fadf3978db65eb8c6937ea2752f4ec3 # v2.1.0
+        with:
+          path: docs/demos/profiles.tape
+
+      - name: Build the site
+        run: uv run mkdocs build --strict
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload the site artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

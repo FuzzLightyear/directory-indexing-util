@@ -43,3 +43,8 @@ research/benchmarks/*.parquet
 
 # Local-only verification scripts (visual/manual checks, not benchmarks)
 research/benchmarks/verify_*.py
+
+# Docs build artifacts (site and demo GIFs are generated in CI)
+site/
+docs/assets/
+demo/
