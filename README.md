@@ -1,6 +1,7 @@
 # directory-indexing-util
 
 [![CI](https://github.com/FuzzLightyear/directory-indexing-util/actions/workflows/ci.yml/badge.svg)](https://github.com/FuzzLightyear/directory-indexing-util/actions/workflows/ci.yml)
+[![Docs](https://github.com/FuzzLightyear/directory-indexing-util/actions/workflows/docs.yml/badge.svg)](https://fuzzlightyear.github.io/directory-indexing-util/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
@@ -12,7 +13,11 @@ Designed for two primary use cases:
 
 > **Maintenance status:** Personal project, casually maintained. **Issues are welcome** for bugs and feature requests. **External pull requests are not accepted**.  Fork freely under MIT for your own changes. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+**Documentation:** guides, animated terminal demos, and the full API reference live at [fuzzlightyear.github.io/directory-indexing-util](https://fuzzlightyear.github.io/directory-indexing-util/).
+
 ## Usage
+
+<!-- --8<-- [start:cli] -->
 
 ### Scanning
 
@@ -198,7 +203,11 @@ uv run dirindex index /some/directory
 dirindex --version
 ```
 
+<!-- --8<-- [end:cli] -->
+
 ## Use as a Library
+
+<!-- --8<-- [start:library] -->
 
 The CLI is a thin wrapper over a stable Python API.  Add the package to your project (`uv add directory-indexing-util`) and import directly:
 
@@ -244,6 +253,8 @@ The package ships inline type hints with a [PEP 561](https://peps.python.org/pep
 | `__version__` | str | Installed package version |
 
 Anything not in this list (internal modules, CLI helpers, the `progress` utilities) is an implementation detail and may change without notice.
+
+<!-- --8<-- [end:library] -->
 
 ## Platform Support
 
