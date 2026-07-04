@@ -103,3 +103,9 @@ warn_unused_configs = true
 [[tool.mypy.overrides]]
 module = ["polars.*", "loguru.*", "blake3.*"]
 ignore_missing_imports = true
+
+[dependency-groups]
+docs = [
+    "mkdocs-material==9.7.6",
+    "mkdocstrings[python]==1.0.4",
+]
