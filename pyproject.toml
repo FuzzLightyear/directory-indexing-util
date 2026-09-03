@@ -106,6 +106,6 @@ ignore_missing_imports = true
 
 [dependency-groups]
 docs = [
-    "mkdocs-material==9.7.6",
+    "mkdocs-material==9.7.7",
     "mkdocstrings[python]==1.0.4",
 ]
